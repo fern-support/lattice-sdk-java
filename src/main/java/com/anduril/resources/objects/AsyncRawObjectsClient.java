@@ -199,10 +199,10 @@ public class AsyncRawObjectsClient {
                 .addHeader("Accept", "application/json");
         if (request.getAcceptEncoding().isPresent()) {
             _requestBuilder.addHeader(
-                    "acceptEncoding", request.getAcceptEncoding().get().toString());
+                    "Accept-Encoding", request.getAcceptEncoding().get().toString());
         }
         if (request.getPriority().isPresent()) {
-            _requestBuilder.addHeader("priority", request.getPriority().get());
+            _requestBuilder.addHeader("Priority", request.getPriority().get());
         }
         Request okhttpRequest = _requestBuilder.build();
         OkHttpClient client = clientOptions.httpClient();
