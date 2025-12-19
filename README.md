@@ -52,7 +52,7 @@ Add the dependency in your `pom.xml` file:
 <dependency>
   <groupId>com.anduril</groupId>
   <artifactId>lattice-sdk</artifactId>
-  <version>5.0.0</version>
+  <version>1.0.0</version>
 </dependency>
 ```
 
@@ -68,23 +68,44 @@ Instantiate and use the client with the following:
 package com.example.usage;
 
 import com.anduril.Lattice;
-import com.anduril.resources.entities.requests.EntityEventRequest;
+import com.anduril.resources.oauth2.requests.GetTokenRequest;
 
 public class Example {
     public static void main(String[] args) {
-        Lattice client = Lattice
-            .builder()
-            .token("<token>")
-            .build();
+        Lattice client = Lattice.withCredentials("<clientId>", "<clientSecret>")
+            .build()
+        ;
 
-        client.entities().longPollEntityEvents(
-            EntityEventRequest
+        client.oAuth2().getToken(
+            GetTokenRequest
                 .builder()
-                .sessionToken("sessionToken")
                 .build()
         );
     }
 }
+```
+## Authentication
+
+This SDK supports two authentication methods:
+
+### Option 1: Direct Bearer Token
+
+If you already have a valid access token, you can use it directly:
+
+```java
+Lattice client = Lattice.withToken("your-access-token")
+    .url("https://api.example.com")
+    .build();
+```
+
+### Option 2: OAuth Client Credentials
+
+The SDK can automatically handle token acquisition and refresh:
+
+```java
+Lattice client = Lattice.withCredentials("client-id", "client-secret")
+    .url("https://api.example.com")
+    .build();
 ```
 
 ## Environments
@@ -122,7 +143,7 @@ When the API returns a non-success status code (4xx or 5xx response), an API exc
 import com.anduril.core.AndurilApiApiException;
 
 try{
-    client.entities().longPollEntityEvents(...);
+    client.oAuth2().getToken(...);
 } catch (AndurilApiApiException e){
     // Do something with the API exception...
 }
@@ -175,7 +196,6 @@ Lattice client = Lattice
 ### Timeouts
 
 The SDK defaults to a 60 second timeout. You can configure this with a timeout option at the client or request level.
-
 ```java
 import com.anduril.Lattice;
 import com.anduril.core.RequestOptions;
@@ -183,15 +203,15 @@ import com.anduril.core.RequestOptions;
 // Client level
 Lattice client = Lattice
     .builder()
-    .timeout(10)
+    .timeout(60)
     .build();
 
 // Request level
-client.entities().longPollEntityEvents(
+client.oAuth2().getToken(
     ...,
     RequestOptions
         .builder()
-        .timeout(10)
+        .timeout(60)
         .build()
 );
 ```
@@ -213,7 +233,7 @@ Lattice client = Lattice
 ;
 
 // Request level
-client.entities().longPollEntityEvents(
+client.oAuth2().getToken(
     ...,
     RequestOptions
         .builder()
@@ -229,7 +249,7 @@ The `withRawResponse()` method returns a raw client that wraps all responses wit
 (A normal client's `response` is identical to a raw client's `response.body()`.)
 
 ```java
-LongPollEntityEventsHttpResponse response = client.entities().withRawResponse().longPollEntityEvents(...);
+GetTokenHttpResponse response = client.oAuth2().withRawResponse().getToken(...);
 
 System.out.println(response.body());
 System.out.println(response.headers().get("X-My-Header"));
@@ -237,4 +257,4 @@ System.out.println(response.headers().get("X-My-Header"));
 
 ## Reference
 
-A full reference for this library is available [here](https://github.com/anduril/lattice-sdk-java/blob/HEAD/./reference.md).
+A full reference for this library is available [here](https://github.com/fern-support/lattice-sdk-java/blob/HEAD/./reference.md).

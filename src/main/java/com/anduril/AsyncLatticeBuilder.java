@@ -5,6 +5,8 @@ package com.anduril;
 
 import com.anduril.core.ClientOptions;
 import com.anduril.core.Environment;
+import com.anduril.core.OAuthTokenSupplier;
+import com.anduril.resources.oauth2.OAuth2Client;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
@@ -17,18 +19,32 @@ public class AsyncLatticeBuilder {
 
     private final Map<String, String> customHeaders = new HashMap<>();
 
-    private String token = null;
-
-    private Environment environment = Environment.DEFAULT;
+    protected Environment environment = Environment.DEFAULT;
 
     private OkHttpClient httpClient;
 
     /**
-     * Sets token
+     * Creates a builder that uses a pre-generated access token for authentication.
+     * Use this when you already have a valid access token and want to bypass
+     * the OAuth client credentials flow.
+     *
+     * @param token The access token to use for Authorization header
+     * @return A builder configured for token authentication
      */
-    public AsyncLatticeBuilder token(String token) {
-        this.token = token;
-        return this;
+    public static _TokenAuth withToken(String token) {
+        return new _TokenAuth(token);
+    }
+
+    /**
+     * Creates a builder that uses OAuth client credentials for authentication.
+     * The builder will automatically handle token acquisition and refresh.
+     *
+     * @param clientId The OAuth client ID
+     * @param clientSecret The OAuth client secret
+     * @return A builder configured for OAuth client credentials authentication
+     */
+    public static _CredentialsAuth withCredentials(String clientId, String clientSecret) {
+        return new _CredentialsAuth(clientId, clientSecret);
     }
 
     public AsyncLatticeBuilder environment(Environment environment) {
@@ -117,11 +133,7 @@ public class AsyncLatticeBuilder {
      * }
      * }</pre>
      */
-    protected void setAuthentication(ClientOptions.Builder builder) {
-        if (this.token != null) {
-            builder.addHeader("Authorization", "Bearer " + this.token);
-        }
-    }
+    protected void setAuthentication(ClientOptions.Builder builder) {}
 
     /**
      * Sets the request timeout configuration.
@@ -196,10 +208,94 @@ public class AsyncLatticeBuilder {
     protected void validateConfiguration() {}
 
     public AsyncLattice build() {
-        if (token == null) {
-            throw new RuntimeException("Please provide token");
-        }
         validateConfiguration();
         return new AsyncLattice(buildClientOptions());
+    }
+
+    public static final class _TokenAuth extends AsyncLatticeBuilder {
+        private final String token;
+
+        _TokenAuth(String token) {
+            this.token = token;
+        }
+
+        @Override
+        protected void setAuthentication(ClientOptions.Builder builder) {
+            builder.addHeader("Authorization", "Bearer " + this.token);
+        }
+    }
+
+    public static final class _CredentialsAuth extends AsyncLatticeBuilder {
+        private final String clientId;
+
+        private final String clientSecret;
+
+        private String code = null;
+
+        private String redirectUri = null;
+
+        private String refreshToken = null;
+
+        private String username = null;
+
+        private String password = null;
+
+        private String scope = null;
+
+        _CredentialsAuth(String clientId, String clientSecret) {
+            this.clientId = clientId;
+            this.clientSecret = clientSecret;
+        }
+
+        public _CredentialsAuth code(String code) {
+            this.code = code;
+            return this;
+        }
+
+        public _CredentialsAuth redirectUri(String redirectUri) {
+            this.redirectUri = redirectUri;
+            return this;
+        }
+
+        public _CredentialsAuth refreshToken(String refreshToken) {
+            this.refreshToken = refreshToken;
+            return this;
+        }
+
+        public _CredentialsAuth username(String username) {
+            this.username = username;
+            return this;
+        }
+
+        public _CredentialsAuth password(String password) {
+            this.password = password;
+            return this;
+        }
+
+        public _CredentialsAuth scope(String scope) {
+            this.scope = scope;
+            return this;
+        }
+
+        @Override
+        public AsyncLattice build() {
+            validateConfiguration();
+            ClientOptions baseOptions = buildClientOptions();
+            OAuth2Client authClient = new OAuth2Client(baseOptions);
+            OAuthTokenSupplier oAuthTokenSupplier = new OAuthTokenSupplier(
+                    this.clientId,
+                    this.clientSecret,
+                    this.code,
+                    this.redirectUri,
+                    this.refreshToken,
+                    this.username,
+                    this.password,
+                    this.scope,
+                    authClient);
+            ClientOptions finalOptions = ClientOptions.Builder.from(baseOptions)
+                    .addHeader("Authorization", oAuthTokenSupplier)
+                    .build();
+            return new AsyncLattice(finalOptions);
+        }
     }
 }
