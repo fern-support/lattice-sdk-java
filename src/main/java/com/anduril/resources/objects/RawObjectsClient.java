@@ -19,6 +19,7 @@ import com.anduril.errors.InsufficientStorageError;
 import com.anduril.errors.InternalServerError;
 import com.anduril.errors.NotFoundError;
 import com.anduril.errors.UnauthorizedError;
+import com.anduril.resources.object.types.Error;
 import com.anduril.resources.objects.requests.DeleteObjectRequest;
 import com.anduril.resources.objects.requests.GetObjectMetadataRequest;
 import com.anduril.resources.objects.requests.GetObjectRequest;
@@ -52,6 +53,13 @@ public class RawObjectsClient {
      */
     public LatticeHttpResponse<SyncPagingIterable<PathMetadata>> listObjects() {
         return listObjects(ListObjectsRequest.builder().build());
+    }
+
+    /**
+     * Lists objects in your environment. You can define a prefix to list a subset of your objects. If you do not set a prefix, Lattice returns all available objects. By default this endpoint will list local objects only.
+     */
+    public LatticeHttpResponse<SyncPagingIterable<PathMetadata>> listObjects(RequestOptions requestOptions) {
+        return listObjects(ListObjectsRequest.builder().build(), requestOptions);
     }
 
     /**
@@ -147,6 +155,13 @@ public class RawObjectsClient {
     /**
      * Fetches an object from your environment using the objectPath path parameter.
      */
+    public LatticeHttpResponse<InputStream> getObject(String objectPath, RequestOptions requestOptions) {
+        return getObject(objectPath, GetObjectRequest.builder().build(), requestOptions);
+    }
+
+    /**
+     * Fetches an object from your environment using the objectPath path parameter.
+     */
     public LatticeHttpResponse<InputStream> getObject(String objectPath, GetObjectRequest request) {
         return getObject(objectPath, request, null);
     }
@@ -168,10 +183,10 @@ public class RawObjectsClient {
                 .addHeader("Accept", "application/json");
         if (request.getAcceptEncoding().isPresent()) {
             _requestBuilder.addHeader(
-                    "acceptEncoding", request.getAcceptEncoding().get().toString());
+                    "Accept-Encoding", request.getAcceptEncoding().get().toString());
         }
         if (request.getPriority().isPresent()) {
-            _requestBuilder.addHeader("priority", request.getPriority().get());
+            _requestBuilder.addHeader("Priority", request.getPriority().get());
         }
         Request okhttpRequest = _requestBuilder.build();
         OkHttpClient client = clientOptions.httpClient();
@@ -255,13 +270,13 @@ public class RawObjectsClient {
                                 ObjectMappers.JSON_MAPPER.readValue(responseBodyString, Object.class), response);
                     case 413:
                         throw new ContentTooLargeError(
-                                ObjectMappers.JSON_MAPPER.readValue(responseBodyString, Object.class), response);
+                                ObjectMappers.JSON_MAPPER.readValue(responseBodyString, Error.class), response);
                     case 500:
                         throw new InternalServerError(
                                 ObjectMappers.JSON_MAPPER.readValue(responseBodyString, Object.class), response);
                     case 507:
                         throw new InsufficientStorageError(
-                                ObjectMappers.JSON_MAPPER.readValue(responseBodyString, Object.class), response);
+                                ObjectMappers.JSON_MAPPER.readValue(responseBodyString, Error.class), response);
                 }
             } catch (JsonProcessingException ignored) {
                 // unable to map error response, throwing generic error
@@ -294,6 +309,13 @@ public class RawObjectsClient {
      */
     public LatticeHttpResponse<Void> deleteObject(String objectPath) {
         return deleteObject(objectPath, DeleteObjectRequest.builder().build());
+    }
+
+    /**
+     * Deletes an object from your environment given the objectPath path parameter.
+     */
+    public LatticeHttpResponse<Void> deleteObject(String objectPath, RequestOptions requestOptions) {
+        return deleteObject(objectPath, DeleteObjectRequest.builder().build(), requestOptions);
     }
 
     /**
@@ -360,6 +382,13 @@ public class RawObjectsClient {
      */
     public LatticeHttpResponse<Void> getObjectMetadata(String objectPath) {
         return getObjectMetadata(objectPath, GetObjectMetadataRequest.builder().build());
+    }
+
+    /**
+     * Returns metadata for a specified object path. Use this to fetch metadata such as object size (size_bytes), its expiry time (expiry_time), or its latest update timestamp (last_updated_at).
+     */
+    public LatticeHttpResponse<Void> getObjectMetadata(String objectPath, RequestOptions requestOptions) {
+        return getObjectMetadata(objectPath, GetObjectMetadataRequest.builder().build(), requestOptions);
     }
 
     /**

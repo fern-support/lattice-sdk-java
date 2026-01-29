@@ -4,6 +4,7 @@
 package com.anduril.types;
 
 import com.anduril.core.ObjectMappers;
+import com.anduril.resources.task.types.Team;
 import com.fasterxml.jackson.annotation.JsonAnyGetter;
 import com.fasterxml.jackson.annotation.JsonAnySetter;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
