@@ -6,12 +6,15 @@ package com.anduril;
 import com.anduril.core.ClientOptions;
 import com.anduril.core.Suppliers;
 import com.anduril.resources.entities.EntitiesClient;
+import com.anduril.resources.oauth2.OAuth2Client;
 import com.anduril.resources.objects.ObjectsClient;
 import com.anduril.resources.tasks.TasksClient;
 import java.util.function.Supplier;
 
 public class Lattice {
     protected final ClientOptions clientOptions;
+
+    protected final Supplier<OAuth2Client> oAuth2Client;
 
     protected final Supplier<EntitiesClient> entitiesClient;
 
@@ -21,9 +24,14 @@ public class Lattice {
 
     public Lattice(ClientOptions clientOptions) {
         this.clientOptions = clientOptions;
+        this.oAuth2Client = Suppliers.memoize(() -> new OAuth2Client(clientOptions));
         this.entitiesClient = Suppliers.memoize(() -> new EntitiesClient(clientOptions));
         this.tasksClient = Suppliers.memoize(() -> new TasksClient(clientOptions));
         this.objectsClient = Suppliers.memoize(() -> new ObjectsClient(clientOptions));
+    }
+
+    public OAuth2Client oAuth2() {
+        return this.oAuth2Client.get();
     }
 
     public EntitiesClient entities() {
@@ -38,7 +46,30 @@ public class Lattice {
         return this.objectsClient.get();
     }
 
-    public static LatticeBuilder builder() {
-        return new LatticeBuilder();
+    /**
+     * Creates a client builder using a pre-generated access token.
+     * @param token The access token to use for authentication
+     * @return A builder configured for token authentication
+     */
+    public static LatticeBuilder._TokenAuth withToken(String token) {
+        return LatticeBuilder.withToken(token);
+    }
+
+    /**
+     * Creates a client builder using OAuth client credentials.
+     * @param clientId The OAuth client ID
+     * @param clientSecret The OAuth client secret
+     * @return A builder configured for OAuth authentication
+     */
+    public static LatticeBuilder._CredentialsAuth withCredentials(String clientId, String clientSecret) {
+        return LatticeBuilder.withCredentials(clientId, clientSecret);
+    }
+
+    /**
+     * Creates a new client builder.
+     * @return A builder for configuring and creating the client
+     */
+    public static LatticeBuilder._Builder builder() {
+        return LatticeBuilder.builder();
     }
 }

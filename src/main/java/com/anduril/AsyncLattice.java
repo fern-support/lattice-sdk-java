@@ -6,12 +6,15 @@ package com.anduril;
 import com.anduril.core.ClientOptions;
 import com.anduril.core.Suppliers;
 import com.anduril.resources.entities.AsyncEntitiesClient;
+import com.anduril.resources.oauth2.AsyncOAuth2Client;
 import com.anduril.resources.objects.AsyncObjectsClient;
 import com.anduril.resources.tasks.AsyncTasksClient;
 import java.util.function.Supplier;
 
 public class AsyncLattice {
     protected final ClientOptions clientOptions;
+
+    protected final Supplier<AsyncOAuth2Client> oAuth2Client;
 
     protected final Supplier<AsyncEntitiesClient> entitiesClient;
 
@@ -21,9 +24,14 @@ public class AsyncLattice {
 
     public AsyncLattice(ClientOptions clientOptions) {
         this.clientOptions = clientOptions;
+        this.oAuth2Client = Suppliers.memoize(() -> new AsyncOAuth2Client(clientOptions));
         this.entitiesClient = Suppliers.memoize(() -> new AsyncEntitiesClient(clientOptions));
         this.tasksClient = Suppliers.memoize(() -> new AsyncTasksClient(clientOptions));
         this.objectsClient = Suppliers.memoize(() -> new AsyncObjectsClient(clientOptions));
+    }
+
+    public AsyncOAuth2Client oAuth2() {
+        return this.oAuth2Client.get();
     }
 
     public AsyncEntitiesClient entities() {
@@ -38,7 +46,30 @@ public class AsyncLattice {
         return this.objectsClient.get();
     }
 
-    public static AsyncLatticeBuilder builder() {
-        return new AsyncLatticeBuilder();
+    /**
+     * Creates a client builder using a pre-generated access token.
+     * @param token The access token to use for authentication
+     * @return A builder configured for token authentication
+     */
+    public static AsyncLatticeBuilder._TokenAuth withToken(String token) {
+        return AsyncLatticeBuilder.withToken(token);
+    }
+
+    /**
+     * Creates a client builder using OAuth client credentials.
+     * @param clientId The OAuth client ID
+     * @param clientSecret The OAuth client secret
+     * @return A builder configured for OAuth authentication
+     */
+    public static AsyncLatticeBuilder._CredentialsAuth withCredentials(String clientId, String clientSecret) {
+        return AsyncLatticeBuilder.withCredentials(clientId, clientSecret);
+    }
+
+    /**
+     * Creates a new client builder.
+     * @return A builder for configuring and creating the client
+     */
+    public static AsyncLatticeBuilder._Builder builder() {
+        return AsyncLatticeBuilder.builder();
     }
 }

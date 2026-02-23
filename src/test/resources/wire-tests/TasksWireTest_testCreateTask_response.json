@@ -1,0 +1,84 @@
+{
+  "version": {
+    "taskId": "taskId",
+    "definitionVersion": 1,
+    "statusVersion": 1
+  },
+  "displayName": "displayName",
+  "specification": {
+    "@type": "@type"
+  },
+  "createdBy": {
+    "system": {
+      "serviceName": "serviceName",
+      "entityId": "entityId",
+      "managesOwnScheduling": true
+    },
+    "user": {
+      "userId": "userId"
+    },
+    "team": {
+      "entityId": "entityId",
+      "members": [
+        {}
+      ]
+    }
+  },
+  "lastUpdatedBy": {
+    "system": {
+      "serviceName": "serviceName",
+      "entityId": "entityId",
+      "managesOwnScheduling": true
+    },
+    "user": {
+      "userId": "userId"
+    },
+    "team": {
+      "entityId": "entityId",
+      "members": [
+        {}
+      ]
+    }
+  },
+  "lastUpdateTime": "2024-01-15T09:30:00Z",
+  "status": {
+    "status": "STATUS_INVALID",
+    "taskError": {
+      "code": "ERROR_CODE_INVALID",
+      "message": "message"
+    },
+    "progress": {
+      "@type": "@type"
+    },
+    "result": {
+      "@type": "@type"
+    },
+    "startTime": "2024-01-15T09:30:00Z",
+    "estimate": {
+      "@type": "@type"
+    },
+    "allocation": {
+      "activeAgents": [
+        {}
+      ]
+    }
+  },
+  "scheduledTime": "2024-01-15T09:30:00Z",
+  "relations": {
+    "parentTaskId": "parentTaskId"
+  },
+  "description": "description",
+  "isExecutedElsewhere": true,
+  "createTime": "2024-01-15T09:30:00Z",
+  "replication": {
+    "staleTime": "2024-01-15T09:30:00Z"
+  },
+  "initialEntities": [
+    {
+      "snapshot": true
+    }
+  ],
+  "owner": {
+    "entityId": "entityId"
+  }
+}

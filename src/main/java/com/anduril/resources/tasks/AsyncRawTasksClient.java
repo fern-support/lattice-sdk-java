@@ -62,6 +62,18 @@ public class AsyncRawTasksClient {
      * <p>Once created, a task enters the lifecycle workflow and can be tracked, updated, and managed
      * through other Tasks API endpoints.</p>
      */
+    public CompletableFuture<LatticeHttpResponse<Task>> createTask(RequestOptions requestOptions) {
+        return createTask(TaskCreation.builder().build(), requestOptions);
+    }
+
+    /**
+     * Creates a new Task in the system with the specified parameters.
+     * <p>This method initiates a new task with a unique ID (either provided or auto-generated),
+     * sets the initial task state to STATUS_CREATED, and establishes task ownership. The task
+     * can be assigned to a specific agent through the Relations field.</p>
+     * <p>Once created, a task enters the lifecycle workflow and can be tracked, updated, and managed
+     * through other Tasks API endpoints.</p>
+     */
     public CompletableFuture<LatticeHttpResponse<Task>> createTask(TaskCreation request) {
         return createTask(request, null);
     }
@@ -76,10 +88,14 @@ public class AsyncRawTasksClient {
      */
     public CompletableFuture<LatticeHttpResponse<Task>> createTask(
             TaskCreation request, RequestOptions requestOptions) {
-        HttpUrl httpUrl = HttpUrl.parse(this.clientOptions.environment().getUrl())
+        HttpUrl.Builder httpUrl = HttpUrl.parse(this.clientOptions.environment().getUrl())
                 .newBuilder()
-                .addPathSegments("api/v1/tasks")
-                .build();
+                .addPathSegments("api/v1/tasks");
+        if (requestOptions != null) {
+            requestOptions.getQueryParameters().forEach((_key, _value) -> {
+                httpUrl.addQueryParameter(_key, _value);
+            });
+        }
         RequestBody body;
         try {
             body = RequestBody.create(
@@ -88,7 +104,7 @@ public class AsyncRawTasksClient {
             throw new LatticeException("Failed to serialize request", e);
         }
         Request okhttpRequest = new Request.Builder()
-                .url(httpUrl)
+                .url(httpUrl.build())
                 .method("POST", body)
                 .headers(Headers.of(clientOptions.headers(requestOptions)))
                 .addHeader("Content-Type", "application/json")
@@ -162,6 +178,18 @@ public class AsyncRawTasksClient {
      * <p>By default, the method returns the latest definition version of the task from the manager's
      * perspective.</p>
      */
+    public CompletableFuture<LatticeHttpResponse<Task>> getTask(String taskId, RequestOptions requestOptions) {
+        return getTask(taskId, GetTaskRequest.builder().build(), requestOptions);
+    }
+
+    /**
+     * Retrieves a specific Task by its ID, with options to select a particular task version or view.
+     * <p>This method returns detailed information about a task including its current status,
+     * specification, relations, and other metadata. The response includes the complete Task object
+     * with all associated fields.</p>
+     * <p>By default, the method returns the latest definition version of the task from the manager's
+     * perspective.</p>
+     */
     public CompletableFuture<LatticeHttpResponse<Task>> getTask(String taskId, GetTaskRequest request) {
         return getTask(taskId, request, null);
     }
@@ -176,13 +204,17 @@ public class AsyncRawTasksClient {
      */
     public CompletableFuture<LatticeHttpResponse<Task>> getTask(
             String taskId, GetTaskRequest request, RequestOptions requestOptions) {
-        HttpUrl httpUrl = HttpUrl.parse(this.clientOptions.environment().getUrl())
+        HttpUrl.Builder httpUrl = HttpUrl.parse(this.clientOptions.environment().getUrl())
                 .newBuilder()
                 .addPathSegments("api/v1/tasks")
-                .addPathSegment(taskId)
-                .build();
+                .addPathSegment(taskId);
+        if (requestOptions != null) {
+            requestOptions.getQueryParameters().forEach((_key, _value) -> {
+                httpUrl.addQueryParameter(_key, _value);
+            });
+        }
         Request.Builder _requestBuilder = new Request.Builder()
-                .url(httpUrl)
+                .url(httpUrl.build())
                 .method("GET", null)
                 .headers(Headers.of(clientOptions.headers(requestOptions)))
                 .addHeader("Accept", "application/json");
@@ -264,6 +296,20 @@ public class AsyncRawTasksClient {
      * <p>Terminal states (<code>STATUS_DONE_OK</code> and <code>STATUS_DONE_NOT_OK</code>) are permanent; once a task
      * reaches these states, no further updates are allowed.</p>
      */
+    public CompletableFuture<LatticeHttpResponse<Task>> updateTaskStatus(String taskId, RequestOptions requestOptions) {
+        return updateTaskStatus(taskId, TaskStatusUpdate.builder().build(), requestOptions);
+    }
+
+    /**
+     * Updates the status of a Task as it progresses through its lifecycle.
+     * <p>This method allows agents or operators to report the current state of a task,
+     * which could include changes to task status, and error information.</p>
+     * <p>Each status update increments the task's status_version. When updating status,
+     * clients must provide the current version to ensure consistency. The system rejects
+     * updates with mismatched versions to prevent race conditions.</p>
+     * <p>Terminal states (<code>STATUS_DONE_OK</code> and <code>STATUS_DONE_NOT_OK</code>) are permanent; once a task
+     * reaches these states, no further updates are allowed.</p>
+     */
     public CompletableFuture<LatticeHttpResponse<Task>> updateTaskStatus(String taskId, TaskStatusUpdate request) {
         return updateTaskStatus(taskId, request, null);
     }
@@ -280,12 +326,16 @@ public class AsyncRawTasksClient {
      */
     public CompletableFuture<LatticeHttpResponse<Task>> updateTaskStatus(
             String taskId, TaskStatusUpdate request, RequestOptions requestOptions) {
-        HttpUrl httpUrl = HttpUrl.parse(this.clientOptions.environment().getUrl())
+        HttpUrl.Builder httpUrl = HttpUrl.parse(this.clientOptions.environment().getUrl())
                 .newBuilder()
                 .addPathSegments("api/v1/tasks")
                 .addPathSegment(taskId)
-                .addPathSegments("status")
-                .build();
+                .addPathSegments("status");
+        if (requestOptions != null) {
+            requestOptions.getQueryParameters().forEach((_key, _value) -> {
+                httpUrl.addQueryParameter(_key, _value);
+            });
+        }
         RequestBody body;
         try {
             body = RequestBody.create(
@@ -294,7 +344,7 @@ public class AsyncRawTasksClient {
             throw new LatticeException("Failed to serialize request", e);
         }
         Request okhttpRequest = new Request.Builder()
-                .url(httpUrl)
+                .url(httpUrl.build())
                 .method("PUT", body)
                 .headers(Headers.of(clientOptions.headers(requestOptions)))
                 .addHeader("Content-Type", "application/json")
@@ -389,6 +439,26 @@ public class AsyncRawTasksClient {
      * set of results.</p>
      * <p>By default, this returns the latest task version for each matching task from the manager's perspective.</p>
      */
+    public CompletableFuture<LatticeHttpResponse<TaskQueryResults>> queryTasks(RequestOptions requestOptions) {
+        return queryTasks(TaskQuery.builder().build(), requestOptions);
+    }
+
+    /**
+     * Searches for Tasks that match specified filtering criteria and returns matching tasks in paginated form.
+     * <p>This method allows filtering tasks based on multiple criteria including:</p>
+     * <ul>
+     * <li>Parent task relationships</li>
+     * <li>Task status (with inclusive or exclusive filtering)</li>
+     * <li>Update time ranges</li>
+     * <li>Task view (manager or agent perspective)</li>
+     * <li>Task assignee</li>
+     * <li>Task type (via exact URL matches or prefix matching)</li>
+     * </ul>
+     * <p>Results are returned in pages. When more results are available than can be returned in a single
+     * response, a page_token is provided that can be used in subsequent requests to retrieve the next
+     * set of results.</p>
+     * <p>By default, this returns the latest task version for each matching task from the manager's perspective.</p>
+     */
     public CompletableFuture<LatticeHttpResponse<TaskQueryResults>> queryTasks(TaskQuery request) {
         return queryTasks(request, null);
     }
@@ -411,10 +481,14 @@ public class AsyncRawTasksClient {
      */
     public CompletableFuture<LatticeHttpResponse<TaskQueryResults>> queryTasks(
             TaskQuery request, RequestOptions requestOptions) {
-        HttpUrl httpUrl = HttpUrl.parse(this.clientOptions.environment().getUrl())
+        HttpUrl.Builder httpUrl = HttpUrl.parse(this.clientOptions.environment().getUrl())
                 .newBuilder()
-                .addPathSegments("api/v1/tasks/query")
-                .build();
+                .addPathSegments("api/v1/tasks/query");
+        if (requestOptions != null) {
+            requestOptions.getQueryParameters().forEach((_key, _value) -> {
+                httpUrl.addQueryParameter(_key, _value);
+            });
+        }
         RequestBody body;
         try {
             body = RequestBody.create(
@@ -423,7 +497,7 @@ public class AsyncRawTasksClient {
             throw new LatticeException("Failed to serialize request", e);
         }
         Request okhttpRequest = new Request.Builder()
-                .url(httpUrl)
+                .url(httpUrl.build())
                 .method("POST", body)
                 .headers(Headers.of(clientOptions.headers(requestOptions)))
                 .addHeader("Content-Type", "application/json")
@@ -525,6 +599,29 @@ public class AsyncRawTasksClient {
      * available then the server will hold on to your request for up to 5 minutes, after that 5 minute timeout
      * period you will be expected to reinitiate a new request.</p>
      */
+    public CompletableFuture<LatticeHttpResponse<AgentRequest>> listenAsAgent(RequestOptions requestOptions) {
+        return listenAsAgent(AgentListener.builder().build(), requestOptions);
+    }
+
+    /**
+     * Establishes a server streaming connection that delivers tasks to taskable agents for execution.
+     * <p>This method creates a persistent connection from Tasks API to an agent, allowing the server
+     * to push tasks to the agent as they become available. The agent receives a stream of tasks that
+     * match its selector criteria (entity IDs).</p>
+     * <p>The stream delivers three types of requests:</p>
+     * <ul>
+     * <li>ExecuteRequest: Contains a new task for the agent to execute</li>
+     * <li>CancelRequest: Indicates a task should be canceled</li>
+     * <li>CompleteRequest: Indicates a task should be completed</li>
+     * </ul>
+     * <p>This is the primary method for taskable agents to receive and process tasks in real-time.
+     * Agents should maintain this connection and process incoming tasks according to their capabilities.</p>
+     * <p>When an agent receives a task, it should update the task status using the UpdateStatus endpoint
+     * to provide progress information back to Tasks API.</p>
+     * <p>This is a long polling API that will block until a new task is ready for delivery. If no new task is
+     * available then the server will hold on to your request for up to 5 minutes, after that 5 minute timeout
+     * period you will be expected to reinitiate a new request.</p>
+     */
     public CompletableFuture<LatticeHttpResponse<AgentRequest>> listenAsAgent(AgentListener request) {
         return listenAsAgent(request, null);
     }
@@ -550,10 +647,14 @@ public class AsyncRawTasksClient {
      */
     public CompletableFuture<LatticeHttpResponse<AgentRequest>> listenAsAgent(
             AgentListener request, RequestOptions requestOptions) {
-        HttpUrl httpUrl = HttpUrl.parse(this.clientOptions.environment().getUrl())
+        HttpUrl.Builder httpUrl = HttpUrl.parse(this.clientOptions.environment().getUrl())
                 .newBuilder()
-                .addPathSegments("api/v1/agent/listen")
-                .build();
+                .addPathSegments("api/v1/agent/listen");
+        if (requestOptions != null) {
+            requestOptions.getQueryParameters().forEach((_key, _value) -> {
+                httpUrl.addQueryParameter(_key, _value);
+            });
+        }
         RequestBody body;
         try {
             body = RequestBody.create(
@@ -562,7 +663,7 @@ public class AsyncRawTasksClient {
             throw new LatticeException("Failed to serialize request", e);
         }
         Request okhttpRequest = new Request.Builder()
-                .url(httpUrl)
+                .url(httpUrl.build())
                 .method("POST", body)
                 .headers(Headers.of(clientOptions.headers(requestOptions)))
                 .addHeader("Content-Type", "application/json")
