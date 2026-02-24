@@ -52,7 +52,7 @@ Add the dependency in your `pom.xml` file:
 <dependency>
   <groupId>com.anduril</groupId>
   <artifactId>lattice-sdk</artifactId>
-  <version>5.0.0</version>
+  <version>0.0.9238</version>
 </dependency>
 ```
 
@@ -72,10 +72,9 @@ import com.anduril.resources.entities.requests.EntityEventRequest;
 
 public class Example {
     public static void main(String[] args) {
-        Lattice client = Lattice
-            .builder()
-            .token("<token>")
-            .build();
+        Lattice client = Lattice.withCredentials("<clientId>", "<clientSecret>")
+            .build()
+        ;
 
         client.entities().longPollEntityEvents(
             EntityEventRequest
@@ -85,6 +84,31 @@ public class Example {
         );
     }
 }
+```
+## Authentication
+
+This SDK supports two authentication methods:
+
+### Option 1: Direct Bearer Token
+
+If you already have a valid access token, you can use it directly:
+
+```java
+Lattice client = Lattice.builder()
+    .token("your-access-token")
+    .url("https://api.example.com")
+    .build();
+```
+
+### Option 2: OAuth Client Credentials
+
+The SDK can automatically handle token acquisition and refresh:
+
+```java
+Lattice client = Lattice.builder()
+    .credentials("client-id", "client-secret")
+    .url("https://api.example.com")
+    .build();
 ```
 
 ## Environments
@@ -175,7 +199,6 @@ Lattice client = Lattice
 ### Timeouts
 
 The SDK defaults to a 60 second timeout. You can configure this with a timeout option at the client or request level.
-
 ```java
 import com.anduril.Lattice;
 import com.anduril.core.RequestOptions;
@@ -183,7 +206,7 @@ import com.anduril.core.RequestOptions;
 // Client level
 Lattice client = Lattice
     .builder()
-    .timeout(10)
+    .timeout(60)
     .build();
 
 // Request level
@@ -191,7 +214,7 @@ client.entities().longPollEntityEvents(
     ...,
     RequestOptions
         .builder()
-        .timeout(10)
+        .timeout(60)
         .build()
 );
 ```
@@ -237,4 +260,4 @@ System.out.println(response.headers().get("X-My-Header"));
 
 ## Reference
 
-A full reference for this library is available [here](https://github.com/anduril/lattice-sdk-java/blob/HEAD/./reference.md).
+A full reference for this library is available [here](https://github.com/fern-support/lattice-sdk-java/blob/HEAD/./reference.md).

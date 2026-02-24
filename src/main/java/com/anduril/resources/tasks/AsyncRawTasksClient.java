@@ -10,20 +10,26 @@ import com.anduril.core.LatticeHttpResponse;
 import com.anduril.core.MediaTypes;
 import com.anduril.core.ObjectMappers;
 import com.anduril.core.RequestOptions;
+import com.anduril.core.ResponseBodyReader;
+import com.anduril.core.Stream;
 import com.anduril.errors.BadRequestError;
 import com.anduril.errors.NotFoundError;
 import com.anduril.errors.UnauthorizedError;
 import com.anduril.resources.tasks.requests.AgentListener;
-import com.anduril.resources.tasks.requests.GetTaskRequest;
+import com.anduril.resources.tasks.requests.AgentStreamRequest;
 import com.anduril.resources.tasks.requests.TaskCreation;
 import com.anduril.resources.tasks.requests.TaskQuery;
 import com.anduril.resources.tasks.requests.TaskStatusUpdate;
+import com.anduril.resources.tasks.requests.TaskStreamRequest;
+import com.anduril.resources.tasks.types.StreamAsAgentResponse;
+import com.anduril.resources.tasks.types.StreamTasksResponse;
 import com.anduril.types.AgentRequest;
 import com.anduril.types.Task;
 import com.anduril.types.TaskQueryResults;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import java.io.IOException;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
 import okhttp3.Call;
 import okhttp3.Callback;
 import okhttp3.Headers;
@@ -62,6 +68,18 @@ public class AsyncRawTasksClient {
      * <p>Once created, a task enters the lifecycle workflow and can be tracked, updated, and managed
      * through other Tasks API endpoints.</p>
      */
+    public CompletableFuture<LatticeHttpResponse<Task>> createTask(RequestOptions requestOptions) {
+        return createTask(TaskCreation.builder().build(), requestOptions);
+    }
+
+    /**
+     * Creates a new Task in the system with the specified parameters.
+     * <p>This method initiates a new task with a unique ID (either provided or auto-generated),
+     * sets the initial task state to STATUS_CREATED, and establishes task ownership. The task
+     * can be assigned to a specific agent through the Relations field.</p>
+     * <p>Once created, a task enters the lifecycle workflow and can be tracked, updated, and managed
+     * through other Tasks API endpoints.</p>
+     */
     public CompletableFuture<LatticeHttpResponse<Task>> createTask(TaskCreation request) {
         return createTask(request, null);
     }
@@ -76,10 +94,14 @@ public class AsyncRawTasksClient {
      */
     public CompletableFuture<LatticeHttpResponse<Task>> createTask(
             TaskCreation request, RequestOptions requestOptions) {
-        HttpUrl httpUrl = HttpUrl.parse(this.clientOptions.environment().getUrl())
+        HttpUrl.Builder httpUrl = HttpUrl.parse(this.clientOptions.environment().getUrl())
                 .newBuilder()
-                .addPathSegments("api/v1/tasks")
-                .build();
+                .addPathSegments("api/v1/tasks");
+        if (requestOptions != null) {
+            requestOptions.getQueryParameters().forEach((_key, _value) -> {
+                httpUrl.addQueryParameter(_key, _value);
+            });
+        }
         RequestBody body;
         try {
             body = RequestBody.create(
@@ -88,7 +110,7 @@ public class AsyncRawTasksClient {
             throw new LatticeException("Failed to serialize request", e);
         }
         Request okhttpRequest = new Request.Builder()
-                .url(httpUrl)
+                .url(httpUrl.build())
                 .method("POST", body)
                 .headers(Headers.of(clientOptions.headers(requestOptions)))
                 .addHeader("Content-Type", "application/json")
@@ -151,7 +173,7 @@ public class AsyncRawTasksClient {
      * perspective.</p>
      */
     public CompletableFuture<LatticeHttpResponse<Task>> getTask(String taskId) {
-        return getTask(taskId, GetTaskRequest.builder().build());
+        return getTask(taskId, null);
     }
 
     /**
@@ -162,31 +184,22 @@ public class AsyncRawTasksClient {
      * <p>By default, the method returns the latest definition version of the task from the manager's
      * perspective.</p>
      */
-    public CompletableFuture<LatticeHttpResponse<Task>> getTask(String taskId, GetTaskRequest request) {
-        return getTask(taskId, request, null);
-    }
-
-    /**
-     * Retrieves a specific Task by its ID, with options to select a particular task version or view.
-     * <p>This method returns detailed information about a task including its current status,
-     * specification, relations, and other metadata. The response includes the complete Task object
-     * with all associated fields.</p>
-     * <p>By default, the method returns the latest definition version of the task from the manager's
-     * perspective.</p>
-     */
-    public CompletableFuture<LatticeHttpResponse<Task>> getTask(
-            String taskId, GetTaskRequest request, RequestOptions requestOptions) {
-        HttpUrl httpUrl = HttpUrl.parse(this.clientOptions.environment().getUrl())
+    public CompletableFuture<LatticeHttpResponse<Task>> getTask(String taskId, RequestOptions requestOptions) {
+        HttpUrl.Builder httpUrl = HttpUrl.parse(this.clientOptions.environment().getUrl())
                 .newBuilder()
                 .addPathSegments("api/v1/tasks")
-                .addPathSegment(taskId)
-                .build();
-        Request.Builder _requestBuilder = new Request.Builder()
-                .url(httpUrl)
+                .addPathSegment(taskId);
+        if (requestOptions != null) {
+            requestOptions.getQueryParameters().forEach((_key, _value) -> {
+                httpUrl.addQueryParameter(_key, _value);
+            });
+        }
+        Request okhttpRequest = new Request.Builder()
+                .url(httpUrl.build())
                 .method("GET", null)
                 .headers(Headers.of(clientOptions.headers(requestOptions)))
-                .addHeader("Accept", "application/json");
-        Request okhttpRequest = _requestBuilder.build();
+                .addHeader("Accept", "application/json")
+                .build();
         OkHttpClient client = clientOptions.httpClient();
         if (requestOptions != null && requestOptions.getTimeout().isPresent()) {
             client = clientOptions.httpClientWithTimeout(requestOptions);
@@ -264,6 +277,20 @@ public class AsyncRawTasksClient {
      * <p>Terminal states (<code>STATUS_DONE_OK</code> and <code>STATUS_DONE_NOT_OK</code>) are permanent; once a task
      * reaches these states, no further updates are allowed.</p>
      */
+    public CompletableFuture<LatticeHttpResponse<Task>> updateTaskStatus(String taskId, RequestOptions requestOptions) {
+        return updateTaskStatus(taskId, TaskStatusUpdate.builder().build(), requestOptions);
+    }
+
+    /**
+     * Updates the status of a Task as it progresses through its lifecycle.
+     * <p>This method allows agents or operators to report the current state of a task,
+     * which could include changes to task status, and error information.</p>
+     * <p>Each status update increments the task's status_version. When updating status,
+     * clients must provide the current version to ensure consistency. The system rejects
+     * updates with mismatched versions to prevent race conditions.</p>
+     * <p>Terminal states (<code>STATUS_DONE_OK</code> and <code>STATUS_DONE_NOT_OK</code>) are permanent; once a task
+     * reaches these states, no further updates are allowed.</p>
+     */
     public CompletableFuture<LatticeHttpResponse<Task>> updateTaskStatus(String taskId, TaskStatusUpdate request) {
         return updateTaskStatus(taskId, request, null);
     }
@@ -280,12 +307,16 @@ public class AsyncRawTasksClient {
      */
     public CompletableFuture<LatticeHttpResponse<Task>> updateTaskStatus(
             String taskId, TaskStatusUpdate request, RequestOptions requestOptions) {
-        HttpUrl httpUrl = HttpUrl.parse(this.clientOptions.environment().getUrl())
+        HttpUrl.Builder httpUrl = HttpUrl.parse(this.clientOptions.environment().getUrl())
                 .newBuilder()
                 .addPathSegments("api/v1/tasks")
                 .addPathSegment(taskId)
-                .addPathSegments("status")
-                .build();
+                .addPathSegments("status");
+        if (requestOptions != null) {
+            requestOptions.getQueryParameters().forEach((_key, _value) -> {
+                httpUrl.addQueryParameter(_key, _value);
+            });
+        }
         RequestBody body;
         try {
             body = RequestBody.create(
@@ -294,7 +325,7 @@ public class AsyncRawTasksClient {
             throw new LatticeException("Failed to serialize request", e);
         }
         Request okhttpRequest = new Request.Builder()
-                .url(httpUrl)
+                .url(httpUrl.build())
                 .method("PUT", body)
                 .headers(Headers.of(clientOptions.headers(requestOptions)))
                 .addHeader("Content-Type", "application/json")
@@ -389,6 +420,26 @@ public class AsyncRawTasksClient {
      * set of results.</p>
      * <p>By default, this returns the latest task version for each matching task from the manager's perspective.</p>
      */
+    public CompletableFuture<LatticeHttpResponse<TaskQueryResults>> queryTasks(RequestOptions requestOptions) {
+        return queryTasks(TaskQuery.builder().build(), requestOptions);
+    }
+
+    /**
+     * Searches for Tasks that match specified filtering criteria and returns matching tasks in paginated form.
+     * <p>This method allows filtering tasks based on multiple criteria including:</p>
+     * <ul>
+     * <li>Parent task relationships</li>
+     * <li>Task status (with inclusive or exclusive filtering)</li>
+     * <li>Update time ranges</li>
+     * <li>Task view (manager or agent perspective)</li>
+     * <li>Task assignee</li>
+     * <li>Task type (via exact URL matches or prefix matching)</li>
+     * </ul>
+     * <p>Results are returned in pages. When more results are available than can be returned in a single
+     * response, a page_token is provided that can be used in subsequent requests to retrieve the next
+     * set of results.</p>
+     * <p>By default, this returns the latest task version for each matching task from the manager's perspective.</p>
+     */
     public CompletableFuture<LatticeHttpResponse<TaskQueryResults>> queryTasks(TaskQuery request) {
         return queryTasks(request, null);
     }
@@ -411,10 +462,14 @@ public class AsyncRawTasksClient {
      */
     public CompletableFuture<LatticeHttpResponse<TaskQueryResults>> queryTasks(
             TaskQuery request, RequestOptions requestOptions) {
-        HttpUrl httpUrl = HttpUrl.parse(this.clientOptions.environment().getUrl())
+        HttpUrl.Builder httpUrl = HttpUrl.parse(this.clientOptions.environment().getUrl())
                 .newBuilder()
-                .addPathSegments("api/v1/tasks/query")
-                .build();
+                .addPathSegments("api/v1/tasks/query");
+        if (requestOptions != null) {
+            requestOptions.getQueryParameters().forEach((_key, _value) -> {
+                httpUrl.addQueryParameter(_key, _value);
+            });
+        }
         RequestBody body;
         try {
             body = RequestBody.create(
@@ -423,7 +478,7 @@ public class AsyncRawTasksClient {
             throw new LatticeException("Failed to serialize request", e);
         }
         Request okhttpRequest = new Request.Builder()
-                .url(httpUrl)
+                .url(httpUrl.build())
                 .method("POST", body)
                 .headers(Headers.of(clientOptions.headers(requestOptions)))
                 .addHeader("Content-Type", "application/json")
@@ -459,6 +514,115 @@ public class AsyncRawTasksClient {
                                 return;
                             case 404:
                                 future.completeExceptionally(new NotFoundError(
+                                        ObjectMappers.JSON_MAPPER.readValue(responseBodyString, Object.class),
+                                        response));
+                                return;
+                        }
+                    } catch (JsonProcessingException ignored) {
+                        // unable to map error response, throwing generic error
+                    }
+                    Object errorBody = ObjectMappers.parseErrorBody(responseBodyString);
+                    future.completeExceptionally(new LatticeApiException(
+                            "Error with status code " + response.code(), response.code(), errorBody, response));
+                    return;
+                } catch (IOException e) {
+                    future.completeExceptionally(new LatticeException("Network error executing HTTP request", e));
+                }
+            }
+
+            @Override
+            public void onFailure(@NotNull Call call, @NotNull IOException e) {
+                future.completeExceptionally(new LatticeException("Network error executing HTTP request", e));
+            }
+        });
+        return future;
+    }
+
+    /**
+     * Establishes a server streaming connection that delivers task updates in real-time using Server-Sent Events (SSE).
+     * <p>The stream delivers all existing non-terminal tasks when first connected, followed by real-time
+     * updates for task creation and status changes. Additionally, heartbeat messages are sent periodically to maintain the connection.</p>
+     */
+    public CompletableFuture<LatticeHttpResponse<Iterable<StreamTasksResponse>>> streamTasks() {
+        return streamTasks(TaskStreamRequest.builder().build());
+    }
+
+    /**
+     * Establishes a server streaming connection that delivers task updates in real-time using Server-Sent Events (SSE).
+     * <p>The stream delivers all existing non-terminal tasks when first connected, followed by real-time
+     * updates for task creation and status changes. Additionally, heartbeat messages are sent periodically to maintain the connection.</p>
+     */
+    public CompletableFuture<LatticeHttpResponse<Iterable<StreamTasksResponse>>> streamTasks(
+            RequestOptions requestOptions) {
+        return streamTasks(TaskStreamRequest.builder().build(), requestOptions);
+    }
+
+    /**
+     * Establishes a server streaming connection that delivers task updates in real-time using Server-Sent Events (SSE).
+     * <p>The stream delivers all existing non-terminal tasks when first connected, followed by real-time
+     * updates for task creation and status changes. Additionally, heartbeat messages are sent periodically to maintain the connection.</p>
+     */
+    public CompletableFuture<LatticeHttpResponse<Iterable<StreamTasksResponse>>> streamTasks(
+            TaskStreamRequest request) {
+        return streamTasks(request, null);
+    }
+
+    /**
+     * Establishes a server streaming connection that delivers task updates in real-time using Server-Sent Events (SSE).
+     * <p>The stream delivers all existing non-terminal tasks when first connected, followed by real-time
+     * updates for task creation and status changes. Additionally, heartbeat messages are sent periodically to maintain the connection.</p>
+     */
+    public CompletableFuture<LatticeHttpResponse<Iterable<StreamTasksResponse>>> streamTasks(
+            TaskStreamRequest request, RequestOptions requestOptions) {
+        HttpUrl.Builder httpUrl = HttpUrl.parse(this.clientOptions.environment().getUrl())
+                .newBuilder()
+                .addPathSegments("api/v1/tasks/stream");
+        if (requestOptions != null) {
+            requestOptions.getQueryParameters().forEach((_key, _value) -> {
+                httpUrl.addQueryParameter(_key, _value);
+            });
+        }
+        RequestBody body;
+        try {
+            body = RequestBody.create(
+                    ObjectMappers.JSON_MAPPER.writeValueAsBytes(request), MediaTypes.APPLICATION_JSON);
+        } catch (JsonProcessingException e) {
+            throw new LatticeException("Failed to serialize request", e);
+        }
+        Request okhttpRequest = new Request.Builder()
+                .url(httpUrl.build())
+                .method("POST", body)
+                .headers(Headers.of(clientOptions.headers(requestOptions)))
+                .addHeader("Content-Type", "application/json")
+                .build();
+        OkHttpClient client = clientOptions.httpClient();
+        if (requestOptions != null && requestOptions.getTimeout().isPresent()) {
+            client = clientOptions.httpClientWithTimeout(requestOptions);
+        }
+        client = client.newBuilder().callTimeout(0, TimeUnit.SECONDS).build();
+        CompletableFuture<LatticeHttpResponse<Iterable<StreamTasksResponse>>> future = new CompletableFuture<>();
+        client.newCall(okhttpRequest).enqueue(new Callback() {
+            @Override
+            public void onResponse(@NotNull Call call, @NotNull Response response) throws IOException {
+                try {
+                    ResponseBody responseBody = response.body();
+                    if (response.isSuccessful()) {
+                        future.complete(new LatticeHttpResponse<>(
+                                Stream.fromSseWithEventDiscrimination(
+                                        StreamTasksResponse.class, new ResponseBodyReader(response), "event"),
+                                response));
+                        return;
+                    }
+                    String responseBodyString = responseBody != null ? responseBody.string() : "{}";
+                    try {
+                        switch (response.code()) {
+                            case 400:
+                                future.completeExceptionally(new BadRequestError(
+                                        ObjectMappers.JSON_MAPPER.readValue(responseBodyString, Object.class),
+                                        response));
+                                return;
+                            case 401:
+                                future.completeExceptionally(new UnauthorizedError(
                                         ObjectMappers.JSON_MAPPER.readValue(responseBodyString, Object.class),
                                         response));
                                 return;
@@ -525,6 +689,29 @@ public class AsyncRawTasksClient {
      * available then the server will hold on to your request for up to 5 minutes, after that 5 minute timeout
      * period you will be expected to reinitiate a new request.</p>
      */
+    public CompletableFuture<LatticeHttpResponse<AgentRequest>> listenAsAgent(RequestOptions requestOptions) {
+        return listenAsAgent(AgentListener.builder().build(), requestOptions);
+    }
+
+    /**
+     * Establishes a server streaming connection that delivers tasks to taskable agents for execution.
+     * <p>This method creates a persistent connection from Tasks API to an agent, allowing the server
+     * to push tasks to the agent as they become available. The agent receives a stream of tasks that
+     * match its selector criteria (entity IDs).</p>
+     * <p>The stream delivers three types of requests:</p>
+     * <ul>
+     * <li>ExecuteRequest: Contains a new task for the agent to execute</li>
+     * <li>CancelRequest: Indicates a task should be canceled</li>
+     * <li>CompleteRequest: Indicates a task should be completed</li>
+     * </ul>
+     * <p>This is the primary method for taskable agents to receive and process tasks in real-time.
+     * Agents should maintain this connection and process incoming tasks according to their capabilities.</p>
+     * <p>When an agent receives a task, it should update the task status using the UpdateStatus endpoint
+     * to provide progress information back to Tasks API.</p>
+     * <p>This is a long polling API that will block until a new task is ready for delivery. If no new task is
+     * available then the server will hold on to your request for up to 5 minutes, after that 5 minute timeout
+     * period you will be expected to reinitiate a new request.</p>
+     */
     public CompletableFuture<LatticeHttpResponse<AgentRequest>> listenAsAgent(AgentListener request) {
         return listenAsAgent(request, null);
     }
@@ -550,10 +737,14 @@ public class AsyncRawTasksClient {
      */
     public CompletableFuture<LatticeHttpResponse<AgentRequest>> listenAsAgent(
             AgentListener request, RequestOptions requestOptions) {
-        HttpUrl httpUrl = HttpUrl.parse(this.clientOptions.environment().getUrl())
+        HttpUrl.Builder httpUrl = HttpUrl.parse(this.clientOptions.environment().getUrl())
                 .newBuilder()
-                .addPathSegments("api/v1/agent/listen")
-                .build();
+                .addPathSegments("api/v1/agent/listen");
+        if (requestOptions != null) {
+            requestOptions.getQueryParameters().forEach((_key, _value) -> {
+                httpUrl.addQueryParameter(_key, _value);
+            });
+        }
         RequestBody body;
         try {
             body = RequestBody.create(
@@ -562,7 +753,7 @@ public class AsyncRawTasksClient {
             throw new LatticeException("Failed to serialize request", e);
         }
         Request okhttpRequest = new Request.Builder()
-                .url(httpUrl)
+                .url(httpUrl.build())
                 .method("POST", body)
                 .headers(Headers.of(clientOptions.headers(requestOptions)))
                 .addHeader("Content-Type", "application/json")
@@ -583,6 +774,159 @@ public class AsyncRawTasksClient {
                                 ObjectMappers.JSON_MAPPER.readValue(responseBodyString, AgentRequest.class), response));
                         return;
                     }
+                    try {
+                        switch (response.code()) {
+                            case 400:
+                                future.completeExceptionally(new BadRequestError(
+                                        ObjectMappers.JSON_MAPPER.readValue(responseBodyString, Object.class),
+                                        response));
+                                return;
+                            case 401:
+                                future.completeExceptionally(new UnauthorizedError(
+                                        ObjectMappers.JSON_MAPPER.readValue(responseBodyString, Object.class),
+                                        response));
+                                return;
+                        }
+                    } catch (JsonProcessingException ignored) {
+                        // unable to map error response, throwing generic error
+                    }
+                    Object errorBody = ObjectMappers.parseErrorBody(responseBodyString);
+                    future.completeExceptionally(new LatticeApiException(
+                            "Error with status code " + response.code(), response.code(), errorBody, response));
+                    return;
+                } catch (IOException e) {
+                    future.completeExceptionally(new LatticeException("Network error executing HTTP request", e));
+                }
+            }
+
+            @Override
+            public void onFailure(@NotNull Call call, @NotNull IOException e) {
+                future.completeExceptionally(new LatticeException("Network error executing HTTP request", e));
+            }
+        });
+        return future;
+    }
+
+    /**
+     * Establishes a server streaming connection that delivers tasks to taskable agents for execution
+     * using Server-Sent Events (SSE).
+     * <p>This method creates a connection from the Tasks API to an agent that streams relevant tasks to the listener agent. The agent receives a stream of tasks that match the entities specified by the tasks' selector criteria.</p>
+     * <p>The stream delivers three types of requests:</p>
+     * <ul>
+     * <li><code>ExecuteRequest</code>: Contains a new task for the agent to execute</li>
+     * <li><code>CancelRequest</code>: Indicates a task should be canceled</li>
+     * <li><code>CompleteRequest</code>: Indicates a task should be completed</li>
+     * </ul>
+     * <p>Additionally, heartbeat messages are sent periodically to maintain the connection.</p>
+     * <p>This is recommended method for taskable agents to receive and process tasks in real-time.
+     * Agents should maintain connection to this stream and process incoming tasks according to their capabilities.</p>
+     * <p>When an agent receives a task, it should update the task status using the <code>UpdateStatus</code> endpoint
+     * to provide progress information back to Tasks API.</p>
+     */
+    public CompletableFuture<LatticeHttpResponse<Iterable<StreamAsAgentResponse>>> streamAsAgent() {
+        return streamAsAgent(AgentStreamRequest.builder().build());
+    }
+
+    /**
+     * Establishes a server streaming connection that delivers tasks to taskable agents for execution
+     * using Server-Sent Events (SSE).
+     * <p>This method creates a connection from the Tasks API to an agent that streams relevant tasks to the listener agent. The agent receives a stream of tasks that match the entities specified by the tasks' selector criteria.</p>
+     * <p>The stream delivers three types of requests:</p>
+     * <ul>
+     * <li><code>ExecuteRequest</code>: Contains a new task for the agent to execute</li>
+     * <li><code>CancelRequest</code>: Indicates a task should be canceled</li>
+     * <li><code>CompleteRequest</code>: Indicates a task should be completed</li>
+     * </ul>
+     * <p>Additionally, heartbeat messages are sent periodically to maintain the connection.</p>
+     * <p>This is recommended method for taskable agents to receive and process tasks in real-time.
+     * Agents should maintain connection to this stream and process incoming tasks according to their capabilities.</p>
+     * <p>When an agent receives a task, it should update the task status using the <code>UpdateStatus</code> endpoint
+     * to provide progress information back to Tasks API.</p>
+     */
+    public CompletableFuture<LatticeHttpResponse<Iterable<StreamAsAgentResponse>>> streamAsAgent(
+            RequestOptions requestOptions) {
+        return streamAsAgent(AgentStreamRequest.builder().build(), requestOptions);
+    }
+
+    /**
+     * Establishes a server streaming connection that delivers tasks to taskable agents for execution
+     * using Server-Sent Events (SSE).
+     * <p>This method creates a connection from the Tasks API to an agent that streams relevant tasks to the listener agent. The agent receives a stream of tasks that match the entities specified by the tasks' selector criteria.</p>
+     * <p>The stream delivers three types of requests:</p>
+     * <ul>
+     * <li><code>ExecuteRequest</code>: Contains a new task for the agent to execute</li>
+     * <li><code>CancelRequest</code>: Indicates a task should be canceled</li>
+     * <li><code>CompleteRequest</code>: Indicates a task should be completed</li>
+     * </ul>
+     * <p>Additionally, heartbeat messages are sent periodically to maintain the connection.</p>
+     * <p>This is recommended method for taskable agents to receive and process tasks in real-time.
+     * Agents should maintain connection to this stream and process incoming tasks according to their capabilities.</p>
+     * <p>When an agent receives a task, it should update the task status using the <code>UpdateStatus</code> endpoint
+     * to provide progress information back to Tasks API.</p>
+     */
+    public CompletableFuture<LatticeHttpResponse<Iterable<StreamAsAgentResponse>>> streamAsAgent(
+            AgentStreamRequest request) {
+        return streamAsAgent(request, null);
+    }
+
+    /**
+     * Establishes a server streaming connection that delivers tasks to taskable agents for execution
+     * using Server-Sent Events (SSE).
+     * <p>This method creates a connection from the Tasks API to an agent that streams relevant tasks to the listener agent. The agent receives a stream of tasks that match the entities specified by the tasks' selector criteria.</p>
+     * <p>The stream delivers three types of requests:</p>
+     * <ul>
+     * <li><code>ExecuteRequest</code>: Contains a new task for the agent to execute</li>
+     * <li><code>CancelRequest</code>: Indicates a task should be canceled</li>
+     * <li><code>CompleteRequest</code>: Indicates a task should be completed</li>
+     * </ul>
+     * <p>Additionally, heartbeat messages are sent periodically to maintain the connection.</p>
+     * <p>This is recommended method for taskable agents to receive and process tasks in real-time.
+     * Agents should maintain connection to this stream and process incoming tasks according to their capabilities.</p>
+     * <p>When an agent receives a task, it should update the task status using the <code>UpdateStatus</code> endpoint
+     * to provide progress information back to Tasks API.</p>
+     */
+    public CompletableFuture<LatticeHttpResponse<Iterable<StreamAsAgentResponse>>> streamAsAgent(
+            AgentStreamRequest request, RequestOptions requestOptions) {
+        HttpUrl.Builder httpUrl = HttpUrl.parse(this.clientOptions.environment().getUrl())
+                .newBuilder()
+                .addPathSegments("api/v1/agent/stream");
+        if (requestOptions != null) {
+            requestOptions.getQueryParameters().forEach((_key, _value) -> {
+                httpUrl.addQueryParameter(_key, _value);
+            });
+        }
+        RequestBody body;
+        try {
+            body = RequestBody.create(
+                    ObjectMappers.JSON_MAPPER.writeValueAsBytes(request), MediaTypes.APPLICATION_JSON);
+        } catch (JsonProcessingException e) {
+            throw new LatticeException("Failed to serialize request", e);
+        }
+        Request okhttpRequest = new Request.Builder()
+                .url(httpUrl.build())
+                .method("POST", body)
+                .headers(Headers.of(clientOptions.headers(requestOptions)))
+                .addHeader("Content-Type", "application/json")
+                .build();
+        OkHttpClient client = clientOptions.httpClient();
+        if (requestOptions != null && requestOptions.getTimeout().isPresent()) {
+            client = clientOptions.httpClientWithTimeout(requestOptions);
+        }
+        client = client.newBuilder().callTimeout(0, TimeUnit.SECONDS).build();
+        CompletableFuture<LatticeHttpResponse<Iterable<StreamAsAgentResponse>>> future = new CompletableFuture<>();
+        client.newCall(okhttpRequest).enqueue(new Callback() {
+            @Override
+            public void onResponse(@NotNull Call call, @NotNull Response response) throws IOException {
+                try {
+                    ResponseBody responseBody = response.body();
+                    if (response.isSuccessful()) {
+                        future.complete(new LatticeHttpResponse<>(
+                                Stream.fromSseWithEventDiscrimination(
+                                        StreamAsAgentResponse.class, new ResponseBodyReader(response), "event"),
+                                response));
+                        return;
+                    }
+                    String responseBodyString = responseBody != null ? responseBody.string() : "{}";
                     try {
                         switch (response.code()) {
                             case 400:

@@ -9,6 +9,9 @@ import com.anduril.core.ObjectMappers;
 import com.anduril.core.Stream;
 import java.io.IOException;
 import java.io.StringReader;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -17,8 +20,9 @@ import org.junit.jupiter.api.Test;
 public final class StreamTest {
     @Test
     public void testJsonStream() {
-        List<Map> messages = List.of(Map.of("message", "hello"), Map.of("message", "world"));
-        List jsonStrings = messages.stream().map(StreamTest::mapToJson).collect(Collectors.toList());
+        List<Map<String, String>> messages =
+                Arrays.asList(createMap("message", "hello"), createMap("message", "world"));
+        List<String> jsonStrings = messages.stream().map(StreamTest::mapToJson).collect(Collectors.toList());
         String input = String.join("\n", jsonStrings);
         StringReader jsonInput = new StringReader(input);
         Stream<Map> jsonStream = Stream.fromJson(Map.class, jsonInput);
@@ -33,8 +37,8 @@ public final class StreamTest {
 
     @Test
     public void testSseStream() {
-        List<Map> events = List.of(Map.of("event", "start"), Map.of("event", "end"));
-        List sseStrings = events.stream().map(StreamTest::mapToSse).collect(Collectors.toList());
+        List<Map<String, String>> events = Arrays.asList(createMap("event", "start"), createMap("event", "end"));
+        List<String> sseStrings = events.stream().map(StreamTest::mapToSse).collect(Collectors.toList());
         String input = String.join("\n" + "\n", sseStrings);
         StringReader sseInput = new StringReader(input);
         Stream<Map> sseStream = Stream.fromSse(Map.class, sseInput);
@@ -49,8 +53,9 @@ public final class StreamTest {
 
     @Test
     public void testSseStreamWithTerminator() {
-        List<Map> events = List.of(Map.of("message", "first"), Map.of("message", "second"));
-        List sseStrings = events.stream().map(StreamTest::mapToSse).collect(Collectors.toList());
+        List<Map<String, String>> events = Arrays.asList(createMap("message", "first"), createMap("message", "second"));
+        List<String> sseStrings =
+                new ArrayList<>(events.stream().map(StreamTest::mapToSse).collect(Collectors.toList()));
         sseStrings.add("data: [DONE]");
         String input = String.join("\n" + "\n", sseStrings);
         StringReader sseInput = new StringReader(input);
@@ -60,6 +65,25 @@ public final class StreamTest {
         for (Map eventData : sseStream) {
             actualEvents++;
             assertTrue(eventData.containsKey("message"));
+        }
+        assertEquals(expectedEvents, actualEvents);
+    }
+
+    @Test
+    public void testSseEventDiscriminatedStream() {
+        List<String> sseStrings = Arrays.asList(
+                mapToSseWithEvent("start", createMap("status", "pending")),
+                mapToSseWithEvent("end", createMap("status", "complete")));
+        String input = String.join("\n" + "\n", sseStrings);
+        StringReader sseInput = new StringReader(input);
+        Stream<Map> sseStream = Stream.fromSseWithEventDiscrimination(Map.class, sseInput, "event");
+        int expectedEvents = 2;
+        int actualEvents = 0;
+        for (Map eventData : sseStream) {
+            actualEvents++;
+            // Event-level discrimination includes the event field in the parsed result
+            assertTrue(eventData.containsKey("event"));
+            assertTrue(eventData.containsKey("data"));
         }
         assertEquals(expectedEvents, actualEvents);
     }
@@ -82,5 +106,15 @@ public final class StreamTest {
 
     private static String mapToSse(Map map) {
         return "data: " + mapToJson(map);
+    }
+
+    private static String mapToSseWithEvent(String eventType, Map data) {
+        return "event: " + eventType + "\n" + "data: " + mapToJson(data);
+    }
+
+    private static Map<String, String> createMap(String key, String value) {
+        Map<String, String> map = new HashMap<>();
+        map.put(key, value);
+        return map;
     }
 }

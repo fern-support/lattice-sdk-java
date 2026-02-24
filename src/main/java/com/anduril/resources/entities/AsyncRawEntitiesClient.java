@@ -20,14 +20,14 @@ import com.anduril.errors.UnauthorizedError;
 import com.anduril.resources.entities.requests.EntityEventRequest;
 import com.anduril.resources.entities.requests.EntityOverride;
 import com.anduril.resources.entities.requests.EntityStreamRequest;
-import com.anduril.resources.entities.requests.GetEntityRequest;
-import com.anduril.resources.entities.requests.RemoveEntityOverrideRequest;
 import com.anduril.resources.entities.types.StreamEntitiesResponse;
+import com.anduril.resources.entity.types.Error;
 import com.anduril.types.Entity;
 import com.anduril.types.EntityEventResponse;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import java.io.IOException;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
 import okhttp3.Call;
 import okhttp3.Callback;
 import okhttp3.Headers;
@@ -66,6 +66,18 @@ public class AsyncRawEntitiesClient {
      * then it will be created. Otherwise the entity will be updated. An entity will only be updated if its
      * provenance.sourceUpdateTime is greater than the provenance.sourceUpdateTime of the existing entity.</p>
      */
+    public CompletableFuture<LatticeHttpResponse<Entity>> publishEntity(RequestOptions requestOptions) {
+        return publishEntity(Entity.builder().build(), requestOptions);
+    }
+
+    /**
+     * Publish an entity for ingest into the Entities API. Entities created with this method are &quot;owned&quot; by the originator: other sources,
+     * such as the UI, may not edit or delete these entities. The server validates entities at API call time and
+     * returns an error if the entity is invalid.
+     * <p>An entity ID must be provided when calling this endpoint. If the entity referenced by the entity ID does not exist
+     * then it will be created. Otherwise the entity will be updated. An entity will only be updated if its
+     * provenance.sourceUpdateTime is greater than the provenance.sourceUpdateTime of the existing entity.</p>
+     */
     public CompletableFuture<LatticeHttpResponse<Entity>> publishEntity(Entity request) {
         return publishEntity(request, null);
     }
@@ -79,10 +91,14 @@ public class AsyncRawEntitiesClient {
      * provenance.sourceUpdateTime is greater than the provenance.sourceUpdateTime of the existing entity.</p>
      */
     public CompletableFuture<LatticeHttpResponse<Entity>> publishEntity(Entity request, RequestOptions requestOptions) {
-        HttpUrl httpUrl = HttpUrl.parse(this.clientOptions.environment().getUrl())
+        HttpUrl.Builder httpUrl = HttpUrl.parse(this.clientOptions.environment().getUrl())
                 .newBuilder()
-                .addPathSegments("api/v1/entities")
-                .build();
+                .addPathSegments("api/v1/entities");
+        if (requestOptions != null) {
+            requestOptions.getQueryParameters().forEach((_key, _value) -> {
+                httpUrl.addQueryParameter(_key, _value);
+            });
+        }
         RequestBody body;
         try {
             body = RequestBody.create(
@@ -91,7 +107,7 @@ public class AsyncRawEntitiesClient {
             throw new LatticeException("Failed to serialize request", e);
         }
         Request okhttpRequest = new Request.Builder()
-                .url(httpUrl)
+                .url(httpUrl.build())
                 .method("PUT", body)
                 .headers(Headers.of(clientOptions.headers(requestOptions)))
                 .addHeader("Content-Type", "application/json")
@@ -146,26 +162,25 @@ public class AsyncRawEntitiesClient {
     }
 
     public CompletableFuture<LatticeHttpResponse<Entity>> getEntity(String entityId) {
-        return getEntity(entityId, GetEntityRequest.builder().build());
+        return getEntity(entityId, null);
     }
 
-    public CompletableFuture<LatticeHttpResponse<Entity>> getEntity(String entityId, GetEntityRequest request) {
-        return getEntity(entityId, request, null);
-    }
-
-    public CompletableFuture<LatticeHttpResponse<Entity>> getEntity(
-            String entityId, GetEntityRequest request, RequestOptions requestOptions) {
-        HttpUrl httpUrl = HttpUrl.parse(this.clientOptions.environment().getUrl())
+    public CompletableFuture<LatticeHttpResponse<Entity>> getEntity(String entityId, RequestOptions requestOptions) {
+        HttpUrl.Builder httpUrl = HttpUrl.parse(this.clientOptions.environment().getUrl())
                 .newBuilder()
                 .addPathSegments("api/v1/entities")
-                .addPathSegment(entityId)
-                .build();
-        Request.Builder _requestBuilder = new Request.Builder()
-                .url(httpUrl)
+                .addPathSegment(entityId);
+        if (requestOptions != null) {
+            requestOptions.getQueryParameters().forEach((_key, _value) -> {
+                httpUrl.addQueryParameter(_key, _value);
+            });
+        }
+        Request okhttpRequest = new Request.Builder()
+                .url(httpUrl.build())
                 .method("GET", null)
                 .headers(Headers.of(clientOptions.headers(requestOptions)))
-                .addHeader("Accept", "application/json");
-        Request okhttpRequest = _requestBuilder.build();
+                .addHeader("Accept", "application/json")
+                .build();
         OkHttpClient client = clientOptions.httpClient();
         if (requestOptions != null && requestOptions.getTimeout().isPresent()) {
             client = clientOptions.httpClientWithTimeout(requestOptions);
@@ -240,6 +255,19 @@ public class AsyncRawEntitiesClient {
      * concurrently for the same field path, the last writer wins.</p>
      */
     public CompletableFuture<LatticeHttpResponse<Entity>> overrideEntity(
+            String entityId, String fieldPath, RequestOptions requestOptions) {
+        return overrideEntity(entityId, fieldPath, EntityOverride.builder().build(), requestOptions);
+    }
+
+    /**
+     * Only fields marked with overridable can be overridden. Please refer to our documentation to see the comprehensive
+     * list of fields that can be overridden. The entity in the request body should only have a value set on the field
+     * specified in the field path parameter. Field paths are rooted in the base entity object and must be represented
+     * using lower_snake_case. Do not include &quot;entity&quot; in the field path.
+     * <p>Note that overrides are applied in an eventually consistent manner. If multiple overrides are created
+     * concurrently for the same field path, the last writer wins.</p>
+     */
+    public CompletableFuture<LatticeHttpResponse<Entity>> overrideEntity(
             String entityId, String fieldPath, EntityOverride request) {
         return overrideEntity(entityId, fieldPath, request, null);
     }
@@ -254,13 +282,17 @@ public class AsyncRawEntitiesClient {
      */
     public CompletableFuture<LatticeHttpResponse<Entity>> overrideEntity(
             String entityId, String fieldPath, EntityOverride request, RequestOptions requestOptions) {
-        HttpUrl httpUrl = HttpUrl.parse(this.clientOptions.environment().getUrl())
+        HttpUrl.Builder httpUrl = HttpUrl.parse(this.clientOptions.environment().getUrl())
                 .newBuilder()
                 .addPathSegments("api/v1/entities")
                 .addPathSegment(entityId)
                 .addPathSegments("override")
-                .addPathSegment(fieldPath)
-                .build();
+                .addPathSegment(fieldPath);
+        if (requestOptions != null) {
+            requestOptions.getQueryParameters().forEach((_key, _value) -> {
+                httpUrl.addQueryParameter(_key, _value);
+            });
+        }
         RequestBody body;
         try {
             body = RequestBody.create(
@@ -269,7 +301,7 @@ public class AsyncRawEntitiesClient {
             throw new LatticeException("Failed to serialize request", e);
         }
         Request okhttpRequest = new Request.Builder()
-                .url(httpUrl)
+                .url(httpUrl.build())
                 .method("PUT", body)
                 .headers(Headers.of(clientOptions.headers(requestOptions)))
                 .addHeader("Content-Type", "application/json")
@@ -332,36 +364,31 @@ public class AsyncRawEntitiesClient {
      * This operation clears the override value from the specified field path on the entity.
      */
     public CompletableFuture<LatticeHttpResponse<Entity>> removeEntityOverride(String entityId, String fieldPath) {
-        return removeEntityOverride(
-                entityId, fieldPath, RemoveEntityOverrideRequest.builder().build());
+        return removeEntityOverride(entityId, fieldPath, null);
     }
 
     /**
      * This operation clears the override value from the specified field path on the entity.
      */
     public CompletableFuture<LatticeHttpResponse<Entity>> removeEntityOverride(
-            String entityId, String fieldPath, RemoveEntityOverrideRequest request) {
-        return removeEntityOverride(entityId, fieldPath, request, null);
-    }
-
-    /**
-     * This operation clears the override value from the specified field path on the entity.
-     */
-    public CompletableFuture<LatticeHttpResponse<Entity>> removeEntityOverride(
-            String entityId, String fieldPath, RemoveEntityOverrideRequest request, RequestOptions requestOptions) {
-        HttpUrl httpUrl = HttpUrl.parse(this.clientOptions.environment().getUrl())
+            String entityId, String fieldPath, RequestOptions requestOptions) {
+        HttpUrl.Builder httpUrl = HttpUrl.parse(this.clientOptions.environment().getUrl())
                 .newBuilder()
                 .addPathSegments("api/v1/entities")
                 .addPathSegment(entityId)
                 .addPathSegments("override")
-                .addPathSegment(fieldPath)
-                .build();
-        Request.Builder _requestBuilder = new Request.Builder()
-                .url(httpUrl)
+                .addPathSegment(fieldPath);
+        if (requestOptions != null) {
+            requestOptions.getQueryParameters().forEach((_key, _value) -> {
+                httpUrl.addQueryParameter(_key, _value);
+            });
+        }
+        Request okhttpRequest = new Request.Builder()
+                .url(httpUrl.build())
                 .method("DELETE", null)
                 .headers(Headers.of(clientOptions.headers(requestOptions)))
-                .addHeader("Accept", "application/json");
-        Request okhttpRequest = _requestBuilder.build();
+                .addHeader("Accept", "application/json")
+                .build();
         OkHttpClient client = clientOptions.httpClient();
         if (requestOptions != null && requestOptions.getTimeout().isPresent()) {
             client = clientOptions.httpClientWithTimeout(requestOptions);
@@ -444,10 +471,14 @@ public class AsyncRawEntitiesClient {
      */
     public CompletableFuture<LatticeHttpResponse<EntityEventResponse>> longPollEntityEvents(
             EntityEventRequest request, RequestOptions requestOptions) {
-        HttpUrl httpUrl = HttpUrl.parse(this.clientOptions.environment().getUrl())
+        HttpUrl.Builder httpUrl = HttpUrl.parse(this.clientOptions.environment().getUrl())
                 .newBuilder()
-                .addPathSegments("api/v1/entities/events")
-                .build();
+                .addPathSegments("api/v1/entities/events");
+        if (requestOptions != null) {
+            requestOptions.getQueryParameters().forEach((_key, _value) -> {
+                httpUrl.addQueryParameter(_key, _value);
+            });
+        }
         RequestBody body;
         try {
             body = RequestBody.create(
@@ -456,7 +487,7 @@ public class AsyncRawEntitiesClient {
             throw new LatticeException("Failed to serialize request", e);
         }
         Request okhttpRequest = new Request.Builder()
-                .url(httpUrl)
+                .url(httpUrl.build())
                 .method("POST", body)
                 .headers(Headers.of(clientOptions.headers(requestOptions)))
                 .addHeader("Content-Type", "application/json")
@@ -497,12 +528,12 @@ public class AsyncRawEntitiesClient {
                                 return;
                             case 408:
                                 future.completeExceptionally(new RequestTimeoutError(
-                                        ObjectMappers.JSON_MAPPER.readValue(responseBodyString, Object.class),
+                                        ObjectMappers.JSON_MAPPER.readValue(responseBodyString, Error.class),
                                         response));
                                 return;
                             case 429:
                                 future.completeExceptionally(new TooManyRequestsError(
-                                        ObjectMappers.JSON_MAPPER.readValue(responseBodyString, Object.class),
+                                        ObjectMappers.JSON_MAPPER.readValue(responseBodyString, Error.class),
                                         response));
                                 return;
                         }
@@ -563,6 +594,27 @@ public class AsyncRawEntitiesClient {
      * this provides real-time updates with minimal latency and reduced server load.</p>
      */
     public CompletableFuture<LatticeHttpResponse<Iterable<StreamEntitiesResponse>>> streamEntities(
+            RequestOptions requestOptions) {
+        return streamEntities(EntityStreamRequest.builder().build(), requestOptions);
+    }
+
+    /**
+     * Establishes a server-sent events (SSE) connection that streams entity data in real-time.
+     * This is a one-way connection from server to client that follows the SSE protocol with text/event-stream content type.
+     * <p>This endpoint enables clients to maintain a real-time view of the common operational picture (COP)
+     * by first streaming all pre-existing entities that match filter criteria, then continuously delivering
+     * updates as entities are created, modified, or deleted.</p>
+     * <p>The server first sends events with type PREEXISTING for all live entities matching the filter that existed before the stream was open,
+     * then streams CREATE events for newly created entities, UPDATE events when existing entities change, and DELETED events when entities are removed. The stream remains open
+     * indefinitely unless preExistingOnly is set to true.</p>
+     * <p>Heartbeat messages can be configured to maintain connection health and detect disconnects by setting the heartbeatIntervalMS
+     * parameter. These heartbeats help keep the connection alive and allow clients to verify the server is still responsive.</p>
+     * <p>Clients can optimize bandwidth usage by specifying which entity components they need populated using the componentsToInclude parameter.
+     * This allows receiving only relevant data instead of complete entities.</p>
+     * <p>The connection automatically recovers from temporary disconnections, resuming the stream where it left off. Unlike polling approaches,
+     * this provides real-time updates with minimal latency and reduced server load.</p>
+     */
+    public CompletableFuture<LatticeHttpResponse<Iterable<StreamEntitiesResponse>>> streamEntities(
             EntityStreamRequest request) {
         return streamEntities(request, null);
     }
@@ -585,10 +637,14 @@ public class AsyncRawEntitiesClient {
      */
     public CompletableFuture<LatticeHttpResponse<Iterable<StreamEntitiesResponse>>> streamEntities(
             EntityStreamRequest request, RequestOptions requestOptions) {
-        HttpUrl httpUrl = HttpUrl.parse(this.clientOptions.environment().getUrl())
+        HttpUrl.Builder httpUrl = HttpUrl.parse(this.clientOptions.environment().getUrl())
                 .newBuilder()
-                .addPathSegments("api/v1/entities/stream")
-                .build();
+                .addPathSegments("api/v1/entities/stream");
+        if (requestOptions != null) {
+            requestOptions.getQueryParameters().forEach((_key, _value) -> {
+                httpUrl.addQueryParameter(_key, _value);
+            });
+        }
         RequestBody body;
         try {
             body = RequestBody.create(
@@ -597,16 +653,16 @@ public class AsyncRawEntitiesClient {
             throw new LatticeException("Failed to serialize request", e);
         }
         Request okhttpRequest = new Request.Builder()
-                .url(httpUrl)
+                .url(httpUrl.build())
                 .method("POST", body)
                 .headers(Headers.of(clientOptions.headers(requestOptions)))
                 .addHeader("Content-Type", "application/json")
-                .addHeader("Accept", "application/json")
                 .build();
         OkHttpClient client = clientOptions.httpClient();
         if (requestOptions != null && requestOptions.getTimeout().isPresent()) {
             client = clientOptions.httpClientWithTimeout(requestOptions);
         }
+        client = client.newBuilder().callTimeout(0, TimeUnit.SECONDS).build();
         CompletableFuture<LatticeHttpResponse<Iterable<StreamEntitiesResponse>>> future = new CompletableFuture<>();
         client.newCall(okhttpRequest).enqueue(new Callback() {
             @Override
@@ -615,7 +671,8 @@ public class AsyncRawEntitiesClient {
                     ResponseBody responseBody = response.body();
                     if (response.isSuccessful()) {
                         future.complete(new LatticeHttpResponse<>(
-                                Stream.fromSse(StreamEntitiesResponse.class, new ResponseBodyReader(response)),
+                                Stream.fromSseWithEventDiscrimination(
+                                        StreamEntitiesResponse.class, new ResponseBodyReader(response), "event"),
                                 response));
                         return;
                     }
