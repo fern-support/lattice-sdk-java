@@ -1,9 +1,19 @@
 {
-  "cliVersion": "3.5.0",
+  "cliVersion": "4.3.3",
   "generatorName": "fernapi/fern-java-sdk",
-  "generatorVersion": "3.18.5",
+  "generatorVersion": "3.41.0",
   "generatorConfig": {
     "client-class-name": "Lattice",
-    "package-prefix": "com.anduril"
-  }
+    "package-prefix": "com.anduril",
+    "metadata": {
+      "author": "Anduril Industries, Inc.",
+      "email": "lattice-developers@anduril.com",
+      "package-description": "Anduril Lattice SDK for Java",
+      "reference-url": "https://developer.anduril.com",
+      "license": {
+        "custom": "../../LICENSE"
+      }
+    }
+  },
+  "sdkVersion": "0.0.615"
 }
