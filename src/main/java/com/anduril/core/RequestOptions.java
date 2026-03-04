@@ -10,8 +10,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 
 public final class RequestOptions {
-    private final String token;
-
     private final Optional<Integer> timeout;
 
     private final TimeUnit timeoutTimeUnit;
@@ -20,17 +18,23 @@ public final class RequestOptions {
 
     private final Map<String, Supplier<String>> headerSuppliers;
 
+    private final Map<String, String> queryParameters;
+
+    private final Map<String, Supplier<String>> queryParameterSuppliers;
+
     private RequestOptions(
-            String token,
             Optional<Integer> timeout,
             TimeUnit timeoutTimeUnit,
             Map<String, String> headers,
-            Map<String, Supplier<String>> headerSuppliers) {
-        this.token = token;
+            Map<String, Supplier<String>> headerSuppliers,
+            Map<String, String> queryParameters,
+            Map<String, Supplier<String>> queryParameterSuppliers) {
         this.timeout = timeout;
         this.timeoutTimeUnit = timeoutTimeUnit;
         this.headers = headers;
         this.headerSuppliers = headerSuppliers;
+        this.queryParameters = queryParameters;
+        this.queryParameterSuppliers = queryParameterSuppliers;
     }
 
     public Optional<Integer> getTimeout() {
@@ -43,9 +47,6 @@ public final class RequestOptions {
 
     public Map<String, String> getHeaders() {
         Map<String, String> headers = new HashMap<>();
-        if (this.token != null) {
-            headers.put("Authorization", "Bearer " + this.token);
-        }
         headers.putAll(this.headers);
         this.headerSuppliers.forEach((key, supplier) -> {
             headers.put(key, supplier.get());
@@ -53,13 +54,19 @@ public final class RequestOptions {
         return headers;
     }
 
+    public Map<String, String> getQueryParameters() {
+        Map<String, String> queryParameters = new HashMap<>(this.queryParameters);
+        this.queryParameterSuppliers.forEach((key, supplier) -> {
+            queryParameters.put(key, supplier.get());
+        });
+        return queryParameters;
+    }
+
     public static Builder builder() {
         return new Builder();
     }
 
     public static class Builder {
-        private String token = null;
-
         private Optional<Integer> timeout = Optional.empty();
 
         private TimeUnit timeoutTimeUnit = TimeUnit.SECONDS;
@@ -68,10 +75,9 @@ public final class RequestOptions {
 
         private final Map<String, Supplier<String>> headerSuppliers = new HashMap<>();
 
-        public Builder token(String token) {
-            this.token = token;
-            return this;
-        }
+        private final Map<String, String> queryParameters = new HashMap<>();
+
+        private final Map<String, Supplier<String>> queryParameterSuppliers = new HashMap<>();
 
         public Builder timeout(Integer timeout) {
             this.timeout = Optional.of(timeout);
@@ -94,8 +100,19 @@ public final class RequestOptions {
             return this;
         }
 
+        public Builder addQueryParameter(String key, String value) {
+            this.queryParameters.put(key, value);
+            return this;
+        }
+
+        public Builder addQueryParameter(String key, Supplier<String> value) {
+            this.queryParameterSuppliers.put(key, value);
+            return this;
+        }
+
         public RequestOptions build() {
-            return new RequestOptions(token, timeout, timeoutTimeUnit, headers, headerSuppliers);
+            return new RequestOptions(
+                    timeout, timeoutTimeUnit, headers, headerSuppliers, queryParameters, queryParameterSuppliers);
         }
     }
 }
