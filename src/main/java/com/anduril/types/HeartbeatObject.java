@@ -12,7 +12,6 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonSetter;
 import com.fasterxml.jackson.annotation.Nulls;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
-import java.time.OffsetDateTime;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
@@ -21,21 +20,21 @@ import java.util.Optional;
 @JsonInclude(JsonInclude.Include.NON_ABSENT)
 @JsonDeserialize(builder = HeartbeatObject.Builder.class)
 public final class HeartbeatObject implements IHeartbeatObject {
-    private final Optional<OffsetDateTime> timestamp;
+    private final Optional<String> timestamp;
 
     private final Map<String, Object> additionalProperties;
 
-    private HeartbeatObject(Optional<OffsetDateTime> timestamp, Map<String, Object> additionalProperties) {
+    private HeartbeatObject(Optional<String> timestamp, Map<String, Object> additionalProperties) {
         this.timestamp = timestamp;
         this.additionalProperties = additionalProperties;
     }
 
     /**
-     * @return timestamp of the heartbeat
+     * @return The timestamp at which the heartbeat message was sent.
      */
     @JsonProperty("timestamp")
     @java.lang.Override
-    public Optional<OffsetDateTime> getTimestamp() {
+    public Optional<String> getTimestamp() {
         return timestamp;
     }
 
@@ -70,7 +69,7 @@ public final class HeartbeatObject implements IHeartbeatObject {
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     public static final class Builder {
-        private Optional<OffsetDateTime> timestamp = Optional.empty();
+        private Optional<String> timestamp = Optional.empty();
 
         @JsonAnySetter
         private Map<String, Object> additionalProperties = new HashMap<>();
@@ -83,21 +82,31 @@ public final class HeartbeatObject implements IHeartbeatObject {
         }
 
         /**
-         * <p>timestamp of the heartbeat</p>
+         * <p>The timestamp at which the heartbeat message was sent.</p>
          */
         @JsonSetter(value = "timestamp", nulls = Nulls.SKIP)
-        public Builder timestamp(Optional<OffsetDateTime> timestamp) {
+        public Builder timestamp(Optional<String> timestamp) {
             this.timestamp = timestamp;
             return this;
         }
 
-        public Builder timestamp(OffsetDateTime timestamp) {
+        public Builder timestamp(String timestamp) {
             this.timestamp = Optional.ofNullable(timestamp);
             return this;
         }
 
         public HeartbeatObject build() {
             return new HeartbeatObject(timestamp, additionalProperties);
+        }
+
+        public Builder additionalProperty(String key, Object value) {
+            this.additionalProperties.put(key, value);
+            return this;
+        }
+
+        public Builder additionalProperties(Map<String, Object> additionalProperties) {
+            this.additionalProperties.putAll(additionalProperties);
+            return this;
         }
     }
 }
