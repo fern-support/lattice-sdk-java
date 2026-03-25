@@ -19,7 +19,7 @@ import java.util.Optional;
 
 @JsonInclude(JsonInclude.Include.NON_ABSENT)
 @JsonDeserialize(builder = TaskEventData.Builder.class)
-public final class TaskEventData implements ITaskEventData {
+public final class TaskEventData {
     private final Optional<TaskEventDataTaskEvent> taskEvent;
 
     private final Map<String, Object> additionalProperties;

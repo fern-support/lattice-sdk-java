@@ -10,51 +10,27 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonSetter;
-import com.fasterxml.jackson.annotation.Nulls;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Optional;
+import org.jetbrains.annotations.NotNull;
 
 @JsonInclude(JsonInclude.Include.NON_ABSENT)
 @JsonDeserialize(builder = AgentStreamEvent.Builder.class)
-public final class AgentStreamEvent implements IAgentTaskRequest {
-    private final Optional<ExecuteRequest> executeRequest;
-
-    private final Optional<CancelRequest> cancelRequest;
-
-    private final Optional<CompleteRequest> completeRequest;
+public final class AgentStreamEvent {
+    private final AgentTaskRequest data;
 
     private final Map<String, Object> additionalProperties;
 
-    private AgentStreamEvent(
-            Optional<ExecuteRequest> executeRequest,
-            Optional<CancelRequest> cancelRequest,
-            Optional<CompleteRequest> completeRequest,
-            Map<String, Object> additionalProperties) {
-        this.executeRequest = executeRequest;
-        this.cancelRequest = cancelRequest;
-        this.completeRequest = completeRequest;
+    private AgentStreamEvent(AgentTaskRequest data, Map<String, Object> additionalProperties) {
+        this.data = data;
         this.additionalProperties = additionalProperties;
     }
 
-    @JsonProperty("executeRequest")
-    @java.lang.Override
-    public Optional<ExecuteRequest> getExecuteRequest() {
-        return executeRequest;
-    }
-
-    @JsonProperty("cancelRequest")
-    @java.lang.Override
-    public Optional<CancelRequest> getCancelRequest() {
-        return cancelRequest;
-    }
-
-    @JsonProperty("completeRequest")
-    @java.lang.Override
-    public Optional<CompleteRequest> getCompleteRequest() {
-        return completeRequest;
+    @JsonProperty("data")
+    public AgentTaskRequest getData() {
+        return data;
     }
 
     @java.lang.Override
@@ -69,14 +45,12 @@ public final class AgentStreamEvent implements IAgentTaskRequest {
     }
 
     private boolean equalTo(AgentStreamEvent other) {
-        return executeRequest.equals(other.executeRequest)
-                && cancelRequest.equals(other.cancelRequest)
-                && completeRequest.equals(other.completeRequest);
+        return data.equals(other.data);
     }
 
     @java.lang.Override
     public int hashCode() {
-        return Objects.hash(this.executeRequest, this.cancelRequest, this.completeRequest);
+        return Objects.hash(this.data);
     }
 
     @java.lang.Override
@@ -84,72 +58,58 @@ public final class AgentStreamEvent implements IAgentTaskRequest {
         return ObjectMappers.stringify(this);
     }
 
-    public static Builder builder() {
+    public static DataStage builder() {
         return new Builder();
     }
 
+    public interface DataStage {
+        _FinalStage data(@NotNull AgentTaskRequest data);
+
+        Builder from(AgentStreamEvent other);
+    }
+
+    public interface _FinalStage {
+        AgentStreamEvent build();
+
+        _FinalStage additionalProperty(String key, Object value);
+
+        _FinalStage additionalProperties(Map<String, Object> additionalProperties);
+    }
+
     @JsonIgnoreProperties(ignoreUnknown = true)
-    public static final class Builder {
-        private Optional<ExecuteRequest> executeRequest = Optional.empty();
-
-        private Optional<CancelRequest> cancelRequest = Optional.empty();
-
-        private Optional<CompleteRequest> completeRequest = Optional.empty();
+    public static final class Builder implements DataStage, _FinalStage {
+        private AgentTaskRequest data;
 
         @JsonAnySetter
         private Map<String, Object> additionalProperties = new HashMap<>();
 
         private Builder() {}
 
+        @java.lang.Override
         public Builder from(AgentStreamEvent other) {
-            executeRequest(other.getExecuteRequest());
-            cancelRequest(other.getCancelRequest());
-            completeRequest(other.getCompleteRequest());
+            data(other.getData());
             return this;
         }
 
-        @JsonSetter(value = "executeRequest", nulls = Nulls.SKIP)
-        public Builder executeRequest(Optional<ExecuteRequest> executeRequest) {
-            this.executeRequest = executeRequest;
+        @java.lang.Override
+        @JsonSetter("data")
+        public _FinalStage data(@NotNull AgentTaskRequest data) {
+            this.data = Objects.requireNonNull(data, "data must not be null");
             return this;
         }
 
-        public Builder executeRequest(ExecuteRequest executeRequest) {
-            this.executeRequest = Optional.ofNullable(executeRequest);
-            return this;
-        }
-
-        @JsonSetter(value = "cancelRequest", nulls = Nulls.SKIP)
-        public Builder cancelRequest(Optional<CancelRequest> cancelRequest) {
-            this.cancelRequest = cancelRequest;
-            return this;
-        }
-
-        public Builder cancelRequest(CancelRequest cancelRequest) {
-            this.cancelRequest = Optional.ofNullable(cancelRequest);
-            return this;
-        }
-
-        @JsonSetter(value = "completeRequest", nulls = Nulls.SKIP)
-        public Builder completeRequest(Optional<CompleteRequest> completeRequest) {
-            this.completeRequest = completeRequest;
-            return this;
-        }
-
-        public Builder completeRequest(CompleteRequest completeRequest) {
-            this.completeRequest = Optional.ofNullable(completeRequest);
-            return this;
-        }
-
+        @java.lang.Override
         public AgentStreamEvent build() {
-            return new AgentStreamEvent(executeRequest, cancelRequest, completeRequest, additionalProperties);
+            return new AgentStreamEvent(data, additionalProperties);
         }
 
+        @java.lang.Override
         public Builder additionalProperty(String key, Object value) {
             this.additionalProperties.put(key, value);
             return this;
         }
 
+        @java.lang.Override
         public Builder additionalProperties(Map<String, Object> additionalProperties) {
             this.additionalProperties.putAll(additionalProperties);
             return this;

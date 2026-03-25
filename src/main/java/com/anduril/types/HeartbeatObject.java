@@ -19,7 +19,7 @@ import java.util.Optional;
 
 @JsonInclude(JsonInclude.Include.NON_ABSENT)
 @JsonDeserialize(builder = HeartbeatObject.Builder.class)
-public final class HeartbeatObject implements IHeartbeatObject {
+public final class HeartbeatObject {
     private final Optional<String> timestamp;
 
     private final Map<String, Object> additionalProperties;
@@ -33,7 +33,6 @@ public final class HeartbeatObject implements IHeartbeatObject {
      * @return The timestamp at which the heartbeat message was sent.
      */
     @JsonProperty("timestamp")
-    @java.lang.Override
     public Optional<String> getTimestamp() {
         return timestamp;
     }

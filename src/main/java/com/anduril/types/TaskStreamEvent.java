@@ -10,31 +10,27 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonSetter;
-import com.fasterxml.jackson.annotation.Nulls;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Optional;
+import org.jetbrains.annotations.NotNull;
 
 @JsonInclude(JsonInclude.Include.NON_ABSENT)
 @JsonDeserialize(builder = TaskStreamEvent.Builder.class)
-public final class TaskStreamEvent implements ITaskEventData {
-    private final Optional<TaskEventDataTaskEvent> taskEvent;
+public final class TaskStreamEvent {
+    private final TaskEventData data;
 
     private final Map<String, Object> additionalProperties;
 
-    private TaskStreamEvent(Optional<TaskEventDataTaskEvent> taskEvent, Map<String, Object> additionalProperties) {
-        this.taskEvent = taskEvent;
+    private TaskStreamEvent(TaskEventData data, Map<String, Object> additionalProperties) {
+        this.data = data;
         this.additionalProperties = additionalProperties;
     }
 
-    /**
-     * @return The task event that occurred.
-     */
-    @JsonProperty("taskEvent")
-    public Optional<TaskEventDataTaskEvent> getTaskEvent() {
-        return taskEvent;
+    @JsonProperty("data")
+    public TaskEventData getData() {
+        return data;
     }
 
     @java.lang.Override
@@ -49,12 +45,12 @@ public final class TaskStreamEvent implements ITaskEventData {
     }
 
     private boolean equalTo(TaskStreamEvent other) {
-        return taskEvent.equals(other.taskEvent);
+        return data.equals(other.data);
     }
 
     @java.lang.Override
     public int hashCode() {
-        return Objects.hash(this.taskEvent);
+        return Objects.hash(this.data);
     }
 
     @java.lang.Override
@@ -62,47 +58,58 @@ public final class TaskStreamEvent implements ITaskEventData {
         return ObjectMappers.stringify(this);
     }
 
-    public static Builder builder() {
+    public static DataStage builder() {
         return new Builder();
     }
 
+    public interface DataStage {
+        _FinalStage data(@NotNull TaskEventData data);
+
+        Builder from(TaskStreamEvent other);
+    }
+
+    public interface _FinalStage {
+        TaskStreamEvent build();
+
+        _FinalStage additionalProperty(String key, Object value);
+
+        _FinalStage additionalProperties(Map<String, Object> additionalProperties);
+    }
+
     @JsonIgnoreProperties(ignoreUnknown = true)
-    public static final class Builder {
-        private Optional<TaskEventDataTaskEvent> taskEvent = Optional.empty();
+    public static final class Builder implements DataStage, _FinalStage {
+        private TaskEventData data;
 
         @JsonAnySetter
         private Map<String, Object> additionalProperties = new HashMap<>();
 
         private Builder() {}
 
+        @java.lang.Override
         public Builder from(TaskStreamEvent other) {
-            taskEvent(other.getTaskEvent());
+            data(other.getData());
             return this;
         }
 
-        /**
-         * <p>The task event that occurred.</p>
-         */
-        @JsonSetter(value = "taskEvent", nulls = Nulls.SKIP)
-        public Builder taskEvent(Optional<TaskEventDataTaskEvent> taskEvent) {
-            this.taskEvent = taskEvent;
+        @java.lang.Override
+        @JsonSetter("data")
+        public _FinalStage data(@NotNull TaskEventData data) {
+            this.data = Objects.requireNonNull(data, "data must not be null");
             return this;
         }
 
-        public Builder taskEvent(TaskEventDataTaskEvent taskEvent) {
-            this.taskEvent = Optional.ofNullable(taskEvent);
-            return this;
-        }
-
+        @java.lang.Override
         public TaskStreamEvent build() {
-            return new TaskStreamEvent(taskEvent, additionalProperties);
+            return new TaskStreamEvent(data, additionalProperties);
         }
 
+        @java.lang.Override
         public Builder additionalProperty(String key, Object value) {
             this.additionalProperties.put(key, value);
             return this;
         }
 
+        @java.lang.Override
         public Builder additionalProperties(Map<String, Object> additionalProperties) {
             this.additionalProperties.putAll(additionalProperties);
             return this;
