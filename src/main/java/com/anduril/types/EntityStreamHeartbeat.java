@@ -10,32 +10,27 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonSetter;
-import com.fasterxml.jackson.annotation.Nulls;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Optional;
+import org.jetbrains.annotations.NotNull;
 
 @JsonInclude(JsonInclude.Include.NON_ABSENT)
 @JsonDeserialize(builder = EntityStreamHeartbeat.Builder.class)
-public final class EntityStreamHeartbeat implements IHeartbeatObject {
-    private final Optional<String> timestamp;
+public final class EntityStreamHeartbeat {
+    private final HeartbeatObject data;
 
     private final Map<String, Object> additionalProperties;
 
-    private EntityStreamHeartbeat(Optional<String> timestamp, Map<String, Object> additionalProperties) {
-        this.timestamp = timestamp;
+    private EntityStreamHeartbeat(HeartbeatObject data, Map<String, Object> additionalProperties) {
+        this.data = data;
         this.additionalProperties = additionalProperties;
     }
 
-    /**
-     * @return The timestamp at which the heartbeat message was sent.
-     */
-    @JsonProperty("timestamp")
-    @java.lang.Override
-    public Optional<String> getTimestamp() {
-        return timestamp;
+    @JsonProperty("data")
+    public HeartbeatObject getData() {
+        return data;
     }
 
     @java.lang.Override
@@ -50,12 +45,12 @@ public final class EntityStreamHeartbeat implements IHeartbeatObject {
     }
 
     private boolean equalTo(EntityStreamHeartbeat other) {
-        return timestamp.equals(other.timestamp);
+        return data.equals(other.data);
     }
 
     @java.lang.Override
     public int hashCode() {
-        return Objects.hash(this.timestamp);
+        return Objects.hash(this.data);
     }
 
     @java.lang.Override
@@ -63,47 +58,58 @@ public final class EntityStreamHeartbeat implements IHeartbeatObject {
         return ObjectMappers.stringify(this);
     }
 
-    public static Builder builder() {
+    public static DataStage builder() {
         return new Builder();
     }
 
+    public interface DataStage {
+        _FinalStage data(@NotNull HeartbeatObject data);
+
+        Builder from(EntityStreamHeartbeat other);
+    }
+
+    public interface _FinalStage {
+        EntityStreamHeartbeat build();
+
+        _FinalStage additionalProperty(String key, Object value);
+
+        _FinalStage additionalProperties(Map<String, Object> additionalProperties);
+    }
+
     @JsonIgnoreProperties(ignoreUnknown = true)
-    public static final class Builder {
-        private Optional<String> timestamp = Optional.empty();
+    public static final class Builder implements DataStage, _FinalStage {
+        private HeartbeatObject data;
 
         @JsonAnySetter
         private Map<String, Object> additionalProperties = new HashMap<>();
 
         private Builder() {}
 
+        @java.lang.Override
         public Builder from(EntityStreamHeartbeat other) {
-            timestamp(other.getTimestamp());
+            data(other.getData());
             return this;
         }
 
-        /**
-         * <p>The timestamp at which the heartbeat message was sent.</p>
-         */
-        @JsonSetter(value = "timestamp", nulls = Nulls.SKIP)
-        public Builder timestamp(Optional<String> timestamp) {
-            this.timestamp = timestamp;
+        @java.lang.Override
+        @JsonSetter("data")
+        public _FinalStage data(@NotNull HeartbeatObject data) {
+            this.data = Objects.requireNonNull(data, "data must not be null");
             return this;
         }
 
-        public Builder timestamp(String timestamp) {
-            this.timestamp = Optional.ofNullable(timestamp);
-            return this;
-        }
-
+        @java.lang.Override
         public EntityStreamHeartbeat build() {
-            return new EntityStreamHeartbeat(timestamp, additionalProperties);
+            return new EntityStreamHeartbeat(data, additionalProperties);
         }
 
+        @java.lang.Override
         public Builder additionalProperty(String key, Object value) {
             this.additionalProperties.put(key, value);
             return this;
         }
 
+        @java.lang.Override
         public Builder additionalProperties(Map<String, Object> additionalProperties) {
             this.additionalProperties.putAll(additionalProperties);
             return this;

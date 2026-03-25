@@ -6,6 +6,6 @@
     "client-class-name": "Lattice",
     "package-prefix": "com.anduril"
   },
-  "originGitCommit": "6d576b56fd1504d9291f5a025b50a72f8f3804b3",
-  "sdkVersion": "0.0.2"
+  "originGitCommit": "087ea4d0e00145371175561fdac2deb79f2fe762",
+  "sdkVersion": "0.0.3"
 }

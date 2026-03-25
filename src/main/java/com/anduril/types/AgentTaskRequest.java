@@ -19,7 +19,7 @@ import java.util.Optional;
 
 @JsonInclude(JsonInclude.Include.NON_ABSENT)
 @JsonDeserialize(builder = AgentTaskRequest.Builder.class)
-public final class AgentTaskRequest implements IAgentTaskRequest {
+public final class AgentTaskRequest {
     private final Optional<ExecuteRequest> executeRequest;
 
     private final Optional<CancelRequest> cancelRequest;
@@ -40,19 +40,16 @@ public final class AgentTaskRequest implements IAgentTaskRequest {
     }
 
     @JsonProperty("executeRequest")
-    @java.lang.Override
     public Optional<ExecuteRequest> getExecuteRequest() {
         return executeRequest;
     }
 
     @JsonProperty("cancelRequest")
-    @java.lang.Override
     public Optional<CancelRequest> getCancelRequest() {
         return cancelRequest;
     }
 
     @JsonProperty("completeRequest")
-    @java.lang.Override
     public Optional<CompleteRequest> getCompleteRequest() {
         return completeRequest;
     }
